@@ -1174,7 +1174,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
               maxHeight: `${baseCanvasHeight}px`,
               transform: `scale(${zoomLevel / 100})`,
               transformOrigin: 'top left',
-              fontFamily: project.fontFamily || 'Open Sans',
+              fontFamily: project.fontFamily || 'Arial',
             }}
           onMouseDown={(e) => {
             // Initiate marquee drag selection if left click on paper background
@@ -1793,7 +1793,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
                                       }
                                       return g;
                                     });
-                                    onUpdateActivePage({ grids: updatedGrids });
+                                    handleUpdateGrids(updatedGrids);
                                     setCroppingData(null);
                                   }}
                                   onCancel={() => setCroppingData(null)}
@@ -2041,7 +2041,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
                     style={{
                       userSelect: isSelected ? 'text' : 'none',
                       WebkitUserSelect: isSelected ? 'text' : 'none',
-                      fontFamily: ft.fontFamily || 'Open Sans',
+                      fontFamily: ft.fontFamily || 'Arial',
                       fontSize: `${ft.fontSize}px`,
                       fontWeight:
                         ft.fontWeight === '900'

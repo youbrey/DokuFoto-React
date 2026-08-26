@@ -2,15 +2,18 @@ import React, { useRef } from 'react';
 import { Landmark, Shield, Image as ImageIcon, Upload, Check } from 'lucide-react';
 import { KopSuratData } from '../types';
 import { BITUNG_LOGO_SVG, BITUNG_DIGITAL_LOGO_SVG, GARUDA_LOGO_SVG } from '../utils/constants';
+import { readImageFile } from '../utils/imageFiles';
 
 interface KopSuratPanelProps {
   kopSurat: KopSuratData;
   onUpdateKopSurat: (updated: Partial<KopSuratData>) => void;
+  onImportError?: (message: string) => void;
 }
 
 export const KopSuratPanel: React.FC<KopSuratPanelProps> = ({
   kopSurat,
   onUpdateKopSurat,
+  onImportError,
 }) => {
   const leftLogoInputRef = useRef<HTMLInputElement>(null);
   const rightLogoInputRef = useRef<HTMLInputElement>(null);
@@ -21,19 +24,17 @@ export const KopSuratPanel: React.FC<KopSuratPanelProps> = ({
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
+    readImageFile(file, 'Logo Kop Surat')
+      .then((photo) => {
         if (side === 'left') {
-          onUpdateKopSurat({ logoLeftUrl: result });
+          onUpdateKopSurat({ logoLeftUrl: photo.dataUrl });
         } else {
-          onUpdateKopSurat({ logoRightUrl: result });
+          onUpdateKopSurat({ logoRightUrl: photo.dataUrl });
         }
-      }
-    };
-    reader.readAsDataURL(file);
+      })
+      .catch((error) => {
+        onImportError?.(error instanceof Error ? error.message : 'Logo gagal dibaca.');
+      });
     if (e.target) e.target.value = '';
   };
 
@@ -100,7 +101,7 @@ export const KopSuratPanel: React.FC<KopSuratPanelProps> = ({
                 <input
                   ref={leftLogoInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                   onChange={(e) => handleCustomLogo(e, 'left')}
                 />
@@ -145,7 +146,7 @@ export const KopSuratPanel: React.FC<KopSuratPanelProps> = ({
                 <input
                   ref={rightLogoInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                   onChange={(e) => handleCustomLogo(e, 'right')}
                 />

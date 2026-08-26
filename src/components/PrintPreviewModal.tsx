@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Printer,
   X,
-  CheckCircle,
   AlertCircle,
   Copy,
   Settings,
@@ -17,7 +16,6 @@ import {
 } from 'lucide-react';
 import {
   DocumentProject,
-  PrinterDevice,
   FloatingTextElement,
   CollageGridElement,
   DocumentPage,
@@ -60,45 +58,39 @@ const getPageGrids = (page?: DocumentPage): CollageGridElement[] => {
   return [];
 };
 
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    };
+    return entities[character] ?? character;
+  });
+
+const collectLocalStyles = (): string =>
+  Array.from(document.styleSheets)
+    .map((styleSheet) => {
+      try {
+        return Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join('\n');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+
 export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   isOpen,
   onClose,
   project,
   onUpdateProject,
 }) => {
-  const [selectedPrinter, setSelectedPrinter] = useState<string>('Epson L3210 Series (Setwan DPRD)');
-  const [copies, setCopies] = useState<number>(1);
   const [colorMode, setColorMode] = useState<'color' | 'mono'>('color');
   const [activePreviewPage, setActivePreviewPage] = useState<number>(0);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(90);
-
-  const detectedPrinters: PrinterDevice[] = [
-    {
-      name: 'Epson L3210 Series (Setwan DPRD)',
-      status: 'Ready',
-      isDefault: true,
-      connectionType: 'USB',
-    },
-    {
-      name: 'Canon PIXMA G3010 Series',
-      status: 'Ready',
-      isDefault: false,
-      connectionType: 'Wi-Fi',
-    },
-    {
-      name: 'HP LaserJet Pro MFP M428fdw',
-      status: 'Ready',
-      isDefault: false,
-      connectionType: 'Network',
-    },
-    {
-      name: 'Microsoft Print to PDF',
-      status: 'Ready',
-      isDefault: false,
-      connectionType: 'Virtual',
-    },
-  ];
 
   const paperInfo = PAPER_DIMENSIONS[project.paperSize] || PAPER_DIMENSIONS.F4;
   const isLandscape = project.orientation === 'landscape';
@@ -193,6 +185,52 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     onUpdateProject({ ...project, pages: updatedPages });
   };
 
+  const createPrintMarkup = (innerHtml: string): string => {
+    const safeTitle = escapeHtml(project.title || 'Dokumen Kolase Foto');
+    const safeFont = (project.fontFamily || 'Arial').replace(/[^a-zA-Z0-9 ,_-]/g, '');
+    return `
+      <!DOCTYPE html>
+      <html lang="id">
+        <head>
+          <meta charset="utf-8">
+          <title>${safeTitle}</title>
+          <style>
+            ${collectLocalStyles()}
+            @page {
+              size: ${widthMm}mm ${heightMm}mm ${isLandscape ? 'landscape' : 'portrait'};
+              margin: 0mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              width: 100%;
+              font-family: '${safeFont}', Arial, sans-serif;
+            }
+            .print-single-page {
+              width: ${widthMm}mm !important;
+              height: ${heightMm}mm !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              position: relative !important;
+              overflow: hidden !important;
+              background: #ffffff !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+          </style>
+        </head>
+        <body><div id="print-wrapper">${innerHtml}</div></body>
+      </html>
+    `;
+  };
+
   const handlePrint = () => {
     setIsPrinting(true);
 
@@ -216,54 +254,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       const printDocument = printIframe.contentWindow?.document;
       if (printDocument) {
         printDocument.open();
-        printDocument.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>${project.title || 'Dokumen Kolase Foto'}</title>
-              <link rel="preconnect" href="https://fonts.googleapis.com">
-              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-              <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800;900&family=Playfair+Display:wght@700;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-              <script src="https://cdn.tailwindcss.com"></script>
-              <style>
-                @page {
-                  size: ${widthMm}mm ${heightMm}mm ${isLandscape ? 'landscape' : 'portrait'};
-                  margin: 0mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                html, body {
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  background: #ffffff !important;
-                  width: 100%;
-                  font-family: '${project.fontFamily || 'Open Sans'}', sans-serif;
-                }
-                .print-single-page {
-                  width: ${widthMm}mm !important;
-                  height: ${heightMm}mm !important;
-                  page-break-after: always !important;
-                  break-after: page !important;
-                  position: relative !important;
-                  overflow: hidden !important;
-                  background: #ffffff !important;
-                  box-sizing: border-box !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                }
-              </style>
-            </head>
-            <body>
-              <div id="print-wrapper">
-                ${innerHtml}
-              </div>
-            </body>
-          </html>
-        `);
+        printDocument.write(createPrintMarkup(innerHtml));
         printDocument.close();
 
         // Wait for images inside the iframe to load before triggering print
@@ -325,55 +316,12 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
       const innerHtml = printContainer ? printContainer.innerHTML : '';
       const newWin = window.open('', '_blank');
       if (newWin) {
-        newWin.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>${project.title || 'Dokumen Kolase Foto'}</title>
-              <link rel="preconnect" href="https://fonts.googleapis.com">
-              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-              <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800;900&family=Playfair+Display:wght@700;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-              <script src="https://cdn.tailwindcss.com"></script>
-              <style>
-                @page {
-                  size: ${widthMm}mm ${heightMm}mm ${isLandscape ? 'landscape' : 'portrait'};
-                  margin: 0mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                html, body {
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  background: #ffffff !important;
-                  width: 100%;
-                  font-family: '${project.fontFamily || 'Open Sans'}', sans-serif;
-                }
-                .print-single-page {
-                  width: ${widthMm}mm !important;
-                  height: ${heightMm}mm !important;
-                  page-break-after: always !important;
-                  break-after: page !important;
-                  position: relative !important;
-                  overflow: hidden !important;
-                  background: #ffffff !important;
-                  box-sizing: border-box !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                }
-              </style>
-            </head>
-            <body onload="setTimeout(function(){ window.focus(); window.print(); }, 500);">
-              <div id="print-wrapper">
-                ${innerHtml}
-              </div>
-            </body>
-          </html>
-        `);
+        newWin.document.write(createPrintMarkup(innerHtml));
         newWin.document.close();
+        window.setTimeout(() => {
+          newWin.focus();
+          newWin.print();
+        }, 500);
       } else {
         handlePrint();
       }
@@ -386,7 +334,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
   const getTextEffectStyle = (textEl: FloatingTextElement): React.CSSProperties => {
     const style: React.CSSProperties = {
-      fontFamily: textEl.fontFamily || 'Open Sans',
+      fontFamily: textEl.fontFamily || 'Arial',
       fontSize: `${textEl.fontSize}px`,
       fontWeight: textEl.fontWeight === '900' ? 900 : textEl.fontWeight === 'bold' ? 700 : 400,
       fontStyle: textEl.fontStyle || 'normal',
@@ -429,7 +377,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
           paddingBottom: `${padBottomPx}px`,
           paddingLeft: `${padLeftPx}px`,
           paddingRight: `${padRightPx}px`,
-          fontFamily: project.fontFamily || 'Open Sans',
+          fontFamily: project.fontFamily || 'Arial',
           backgroundColor: '#ffffff',
           overflow: 'hidden',
         }}
@@ -776,54 +724,17 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
               )}
             </div>
 
-            {/* Right: Print Settings & Detected Printer List */}
+            {/* Right: Print Settings */}
             <div className="w-80 bg-slate-900 border-l border-slate-800 p-5 flex flex-col justify-between overflow-y-auto">
               <div className="space-y-4">
-                <div>
+                <div className="p-3 rounded-xl bg-sky-950/50 border border-sky-800/80">
                   <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Settings className="w-3.5 h-3.5 text-slate-400" />
-                    Deteksi Printer Tersedia
+                    Pemilihan Printer
                   </h4>
-                  <div className="space-y-2">
-                    {detectedPrinters.map((p) => {
-                      const isSelected = selectedPrinter === p.name;
-                      return (
-                        <button
-                          key={p.name}
-                          onClick={() => setSelectedPrinter(p.name)}
-                          className={`w-full p-2.5 rounded-xl border text-left text-xs transition flex items-center justify-between ${
-                            isSelected
-                              ? 'bg-slate-800 border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm'
-                              : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <div>
-                            <p className="font-bold text-slate-200 line-clamp-1">{p.name}</p>
-                            <span className="text-[10px] text-slate-400">
-                              {p.connectionType} • {p.status}
-                            </span>
-                          </div>
-                          {isSelected && <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Number of Copies */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 block">Jumlah Salinan (Copies)</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="99"
-                      value={copies}
-                      onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
-                      className="w-20 p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-center text-white"
-                    />
-                    <span className="text-xs text-slate-400">Rangkap Dokumen</span>
-                  </div>
+                  <p className="text-[11px] leading-relaxed text-sky-200/90">
+                    Pilih printer dan jumlah salinan melalui dialog cetak Windows yang muncul setelah menekan tombol cetak.
+                  </p>
                 </div>
 
                 {/* Color Mode */}
@@ -911,7 +822,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>{isPrinting ? 'Menghubungkan ke Printer...' : 'Cetak Dokumen Sekarang'}</span>
+                  <span>{isPrinting ? 'Menyiapkan Dialog Cetak...' : 'Cetak Dokumen Sekarang'}</span>
                 </button>
 
                 <button
@@ -937,4 +848,3 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     </>
   );
 };
-

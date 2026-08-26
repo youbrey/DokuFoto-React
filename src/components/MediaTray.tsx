@@ -11,7 +11,7 @@ import {
   Move,
 } from 'lucide-react';
 import { PhotoMetadata } from '../types';
-import { INITIAL_SETWAN_PHOTOS } from '../utils/constants';
+import { readImageFiles } from '../utils/imageFiles';
 
 interface MediaTrayProps {
   photos: PhotoMetadata[];
@@ -19,6 +19,7 @@ interface MediaTrayProps {
   onRemovePhoto: (id: string) => void;
   onAssignToCell?: (photo: PhotoMetadata) => void;
   onOpenAutoCollage?: () => void;
+  onImportError?: (message: string) => void;
 }
 
 export const MediaTray: React.FC<MediaTrayProps> = ({
@@ -27,42 +28,18 @@ export const MediaTray: React.FC<MediaTrayProps> = ({
   onRemovePhoto,
   onAssignToCell,
   onOpenAutoCollage,
+  onImportError,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOverTray, setDragOverTray] = useState(false);
 
-  const processFiles = (files: FileList | null) => {
+  const processFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-
-    const newPhotos: PhotoMetadata[] = [];
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-
-    Array.from(files).forEach((file) => {
-      if (validImageTypes.includes(file.type) || file.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          if (result) {
-            const photo: PhotoMetadata = {
-              id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-              name: file.name,
-              dataUrl: result,
-              sizeBytes: file.size,
-              capturedDate: new Date(file.lastModified).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              }),
-              category: 'Dokumentasi Lapangan',
-            };
-            onAddPhotos([photo]);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+    const { photos: imported, errors } = await readImageFiles(files);
+    if (imported.length > 0) onAddPhotos(imported);
+    if (errors.length > 0) onImportError?.(errors.slice(0, 3).join(' '));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

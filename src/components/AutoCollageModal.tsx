@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PhotoMetadata, CollageGridElement, CollageCell, CollageLayoutTemplate, DocumentProject } from '../types';
 import { COLLAGE_LAYOUTS, COLOR_PALETTES, PAPER_DIMENSIONS } from '../utils/constants';
+import { readImageFiles } from '../utils/imageFiles';
 
 interface AutoCollageModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ interface AutoCollageModalProps {
   ) => void;
   activePageNumber: number;
   project: DocumentProject;
+  onImportError?: (message: string) => void;
 }
 
 export const AutoCollageModal: React.FC<AutoCollageModalProps> = ({
@@ -45,6 +47,7 @@ export const AutoCollageModal: React.FC<AutoCollageModalProps> = ({
   onApplyCollage,
   activePageNumber,
   project,
+  onImportError,
 }) => {
   // Paper dimensions and orientation from active project
   const paperInfo = PAPER_DIMENSIONS[project?.paperSize || 'F4'] || PAPER_DIMENSIONS.F4;
@@ -103,56 +106,19 @@ export const AutoCollageModal: React.FC<AutoCollageModalProps> = ({
     COLLAGE_LAYOUTS.find((t) => t.id === selectedLayoutId) || candidateTemplates[0] || COLLAGE_LAYOUTS[0];
 
   // Process uploaded files
-  const processUploadedFiles = (files: FileList | null) => {
+  const processUploadedFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-
-    const newPhotos: PhotoMetadata[] = [];
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    let loadedCount = 0;
-    const totalFiles = Array.from(files).filter(
-      (f) => validImageTypes.includes(f.type) || f.name.match(/\.(jpg|jpeg|png|webp)$/i)
-    ).length;
-
-    if (totalFiles === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (validImageTypes.includes(file.type) || file.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          if (result) {
-            const photo: PhotoMetadata = {
-              id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-              name: file.name,
-              dataUrl: result,
-              sizeBytes: file.size,
-              capturedDate: new Date().toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              }),
-              category: 'Dokumentasi Foto Baru',
-            };
-            newPhotos.push(photo);
-            loadedCount++;
-
-            if (loadedCount === totalFiles) {
-              onAddPhotosToGallery(newPhotos);
-              // Auto-select the newly uploaded photos
-              const newIds = newPhotos.map((p) => p.id);
-              setSelectedPhotoIds((prev) => [...newIds, ...prev]);
-
-              // Pick best matching template for total count
-              const bestMatch = COLLAGE_LAYOUTS.find((t) => t.cells.length === newPhotos.length);
-              if (bestMatch) {
-                setSelectedLayoutId(bestMatch.id);
-              }
-            }
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+    const { photos: imported, errors } = await readImageFiles(
+      files,
+      'Dokumentasi Foto Baru',
+    );
+    if (imported.length > 0) {
+      onAddPhotosToGallery(imported);
+      setSelectedPhotoIds((prev) => [...imported.map((photo) => photo.id), ...prev]);
+      const bestMatch = COLLAGE_LAYOUTS.find((template) => template.cells.length === imported.length);
+      if (bestMatch) setSelectedLayoutId(bestMatch.id);
+    }
+    if (errors.length > 0) onImportError?.(errors.slice(0, 3).join(' '));
   };
 
   const handleTogglePhotoSelect = (id: string) => {

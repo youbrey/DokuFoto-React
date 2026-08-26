@@ -241,68 +241,19 @@ export const COLLAGE_LAYOUTS: CollageLayoutTemplate[] = [
   },
 ];
 
-// Sample authentic activity photos for Setwan Kota Bitung
-export const INITIAL_SETWAN_PHOTOS = [
-  {
-    id: 'photo-1',
-    name: 'Sidang_Paripurna_DPRD.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=800&q=80',
-    category: 'Sidang Paripurna',
-    capturedDate: '15 Agustus 2026',
-  },
-  {
-    id: 'photo-2',
-    name: 'Peninjauan_Lapangan_Jalan_Protokol.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?auto=format&fit=crop&w=800&q=80',
-    category: 'Pengawasan Lapangan',
-    capturedDate: '16 Agustus 2026',
-  },
-  {
-    id: 'photo-3',
-    name: 'Rapat_Dengar_Pendapat_Komisi_II.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
-    category: 'Rapat Komisi',
-    capturedDate: '17 Agustus 2026',
-  },
-  {
-    id: 'photo-4',
-    name: 'Pemeriksaan_Fasilitas_Umum.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    category: 'Pengawasan Lapangan',
-    capturedDate: '17 Agustus 2026',
-  },
-  {
-    id: 'photo-5',
-    name: 'Reses_Masa_Persidangan_Ketiga.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1531497865144-0464ef8fb9a9?auto=format&fit=crop&w=800&q=80',
-    category: 'Kegiatan Reses',
-    capturedDate: '18 Agustus 2026',
-  },
-  {
-    id: 'photo-6',
-    name: 'Kunjungan_Kerja_Luar_Daerah.jpg',
-    dataUrl: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&w=800&q=80',
-    category: 'Kunjungan Kerja',
-    capturedDate: '18 Agustus 2026',
-  },
-];
+// Galeri awal sengaja kosong agar startup tidak melakukan permintaan internet.
+export const INITIAL_SETWAN_PHOTOS = [];
 
 // Popular typography fonts supported (matching Canva and standard documents)
 export const AVAILABLE_FONTS = [
-  { name: 'Open Sans', category: 'Modern Sans' },
-  { name: 'Poppins', category: 'Geometric Sans' },
-  { name: 'DM Sans', category: 'Clean Sans' },
-  { name: 'Montserrat', category: 'Bold Sans' },
-  { name: 'Inter', category: 'Interface Sans' },
-  { name: 'Roboto', category: 'Neutral Sans' },
-  { name: 'Playfair Display', category: 'Elegant Serif' },
+  { name: 'Segoe UI', category: 'Windows Sans' },
+  { name: 'Arial', category: 'Standard Sans' },
+  { name: 'Calibri', category: 'Office Sans' },
+  { name: 'Verdana', category: 'Readable Sans' },
+  { name: 'Tahoma', category: 'Compact Sans' },
+  { name: 'Trebuchet MS', category: 'Humanist Sans' },
   { name: 'Times New Roman', category: 'Formal Serif' },
   { name: 'Georgia', category: 'Editorial Serif' },
-  { name: 'Cinzel', category: 'Monumental Serif' },
-  { name: 'Oswald', category: 'Condensed Display' },
-  { name: 'Anton', category: 'Heavy Display' },
-  { name: 'Caveat', category: 'Handwritten Script' },
-  { name: 'Arial', category: 'Standard Sans' },
   { name: 'Courier New', category: 'Monospace' },
 ];
 
@@ -337,7 +288,7 @@ export const createDefaultProject = (): DocumentProject => ({
     left: 2.5, // cm (for filing)
     right: 2.0, // cm
   },
-  fontFamily: 'Open Sans',
+  fontFamily: 'Arial',
   author: 'Bagian Risalah, Dokumentasi dan Persidangan',
   institution: 'Sekretariat DPRD Kota Bitung',
   createdAt: new Date().toISOString(),
@@ -387,7 +338,7 @@ export const createDefaultProject = (): DocumentProject => ({
           y: 12,
           width: 440,
           fontSize: 34,
-          fontFamily: 'Open Sans',
+          fontFamily: 'Arial',
           fontWeight: '900',
           fontStyle: 'normal',
           textDecoration: 'underline',
@@ -441,7 +392,7 @@ export const createDefaultProject = (): DocumentProject => ({
               id: 'c-3',
               row: 1,
               col: 0,
-              photo: INITIAL_SETWAN_PHOTOS[0],
+              photo: null,
               caption: '',
               showCaption: false,
               aspectRatio: '4:3',
@@ -489,7 +440,7 @@ export const createDefaultProject = (): DocumentProject => ({
           id: 'c-3',
           row: 1,
           col: 0,
-          photo: INITIAL_SETWAN_PHOTOS[0],
+          photo: null,
           caption: '',
           showCaption: false,
           aspectRatio: '4:3',

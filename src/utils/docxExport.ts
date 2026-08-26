@@ -63,10 +63,9 @@ async function imageUrlToBuffer(url: string): Promise<Uint8Array | null> {
       return bytes;
     }
 
-    // Regular URL: fetch as arrayBuffer
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
-    return new Uint8Array(arrayBuffer);
+    // DokuFoto berjalan offline; URL jaringan lama tidak diunduh saat ekspor.
+    console.warn('Gambar eksternal dilewati. Impor ulang gambar dari disk agar tersedia offline.');
+    return null;
   } catch (error) {
     console.warn('Failed to load image for docx export:', error);
     return null;
