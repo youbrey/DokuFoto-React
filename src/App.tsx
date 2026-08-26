@@ -3,7 +3,7 @@
  * @license Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   DocumentProject,
   DocumentPage,
@@ -18,8 +18,9 @@ import {
   INITIAL_SETWAN_PHOTOS,
   PAPER_DIMENSIONS,
 } from './utils/constants';
-import { exportProjectToDocx } from './utils/docxExport';
 import { exportProjectArchiveZip } from './utils/zipExport';
+import { loadWorkspace, saveWorkspace } from './utils/persistence';
+import { serializeWorkspace, type WorkspaceSnapshot } from './utils/workspace';
 import { Navbar } from './components/Navbar';
 import { Sidebar, SidebarTab } from './components/Sidebar';
 import { CollageCanvas } from './components/CollageCanvas';
@@ -33,33 +34,11 @@ import { PhotoPickerModal } from './components/PhotoPickerModal';
 import { AutoCollageModal } from './components/AutoCollageModal';
 import saveAs from 'file-saver';
 
-const LOCAL_STORAGE_KEY = 'setwan_dokufoto_project_v2';
-const LOCAL_PHOTOS_KEY = 'setwan_dokufoto_photos_v2';
-
 export default function App() {
-  const [project, setProject] = useState<DocumentProject>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback to default
-      }
-    }
-    return createDefaultProject();
-  });
-
-  const [photos, setPhotos] = useState<PhotoMetadata[]>(() => {
-    const saved = localStorage.getItem(LOCAL_PHOTOS_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_SETWAN_PHOTOS;
-  });
+  const [project, setProject] = useState<DocumentProject>(() => createDefaultProject());
+  const [photos, setPhotos] = useState<PhotoMetadata[]>(INITIAL_SETWAN_PHOTOS);
+  const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+  const toastTimerRef = useRef<number | null>(null);
 
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('templates');
@@ -74,26 +53,50 @@ export default function App() {
   const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Autosave to localStorage
+  // IndexedDB menampung gambar Base64 jauh lebih andal daripada localStorage.
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(project));
-    } catch {
-      // ignore storage quota error for large base64
-    }
-  }, [project]);
+    let cancelled = false;
+    loadWorkspace()
+      .then((saved) => {
+        if (!cancelled && saved) {
+          setProject(saved.project);
+          setPhotos(saved.photos);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNotification({
+            message: 'Penyimpanan lokal tidak dapat dibaca. Proyek baru tetap dapat digunakan.',
+            type: 'error',
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsWorkspaceReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  // Debounce mencegah penulisan ke disk pada setiap frame saat drag/crop.
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_PHOTOS_KEY, JSON.stringify(photos));
-    } catch {
-      // ignore
-    }
-  }, [photos]);
+    if (!isWorkspaceReady) return;
+    const timer = window.setTimeout(() => {
+      saveWorkspace(project, photos).catch(() => {
+        setNotification({
+          message: 'Penyimpanan otomatis gagal. Unduh berkas proyek sebagai cadangan.',
+          type: 'error',
+        });
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [isWorkspaceReady, photos, project]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3500);
+    toastTimerRef.current = window.setTimeout(() => setNotification(null), 3500);
   };
 
   const handleUpdateProject = (updated: Partial<DocumentProject>) => {
@@ -121,7 +124,7 @@ export default function App() {
   // Save Project as JSON file (.dokufoto.json)
   const handleSaveProjectJson = () => {
     try {
-      const blob = new Blob([JSON.stringify(project, null, 2)], {
+      const blob = new Blob([serializeWorkspace(project, photos)], {
         type: 'application/json',
       });
       saveAs(blob, `${project.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.dokufoto.json`);
@@ -131,11 +134,12 @@ export default function App() {
     }
   };
 
-  // Load Project JSON
-  const handleLoadProjectJson = (loadedProject: DocumentProject) => {
-    setProject(loadedProject);
+  // Load Project JSON or archive workspace
+  const handleLoadWorkspace = (workspace: WorkspaceSnapshot) => {
+    setProject(workspace.project);
+    setPhotos(workspace.photos);
     setActivePageIndex(0);
-    showToast(`Proyek "${loadedProject.title}" berhasil dimuat!`, 'success');
+    showToast(`Proyek "${workspace.project.title}" berhasil dimuat!`, 'success');
   };
 
   // Export Archive ZIP (Project + Photos)
@@ -441,7 +445,7 @@ export default function App() {
       x: 50,
       y: 50,
       fontSize: 28,
-      fontFamily: 'Open Sans',
+      fontFamily: 'Arial',
       fontWeight: 'bold',
       fontStyle: 'normal',
       color: '#000000',
@@ -475,6 +479,7 @@ export default function App() {
   const handleExportDocx = async () => {
     setIsExportingDocx(true);
     try {
+      const { exportProjectToDocx } = await import('./utils/docxExport');
       await exportProjectToDocx(project);
       showToast('Dokumen .docx berhasil diekspor dan siap dibuka di Microsoft Word!');
     } catch (err) {
@@ -528,7 +533,7 @@ export default function App() {
                 y: 8,
                 fontSize: 16,
                 fontWeight: '900',
-                fontFamily: project.fontFamily || 'Open Sans',
+                fontFamily: project.fontFamily || 'Arial',
                 color: '#0f172a',
                 textAlign: 'center',
                 width: 480,
@@ -544,7 +549,7 @@ export default function App() {
       setActivePageIndex(project.pages.length);
       showToast('⚡ Kisi kolase foto berhasil dibuat di Halaman Baru!', 'success');
     } else {
-      const updatedFloatingTexts = titleText
+      const updatedFloatingTexts: FloatingTextElement[] | undefined = titleText
         ? [
             ...(activePage.floatingTexts || []),
             {
@@ -554,7 +559,7 @@ export default function App() {
               y: 8,
               fontSize: 16,
               fontWeight: '900',
-              fontFamily: project.fontFamily || 'Open Sans',
+              fontFamily: project.fontFamily || 'Arial',
               color: '#0f172a',
               textAlign: 'center',
               width: 480,
@@ -611,7 +616,8 @@ export default function App() {
         isExportingDocx={isExportingDocx}
         onOpenAutoCollage={() => setIsAutoCollageOpen(true)}
         onSaveProjectJson={handleSaveProjectJson}
-        onLoadProjectJson={handleLoadProjectJson}
+        onLoadWorkspace={handleLoadWorkspace}
+        onImportError={(message) => showToast(message, 'error')}
         onExportArchiveZip={handleExportArchiveZip}
       />
 
@@ -644,7 +650,11 @@ export default function App() {
                   ...c,
                   photo: null,
                 }));
-                handleUpdateActivePage({ cells: updatedCells });
+                const updatedGrids = activePage.grids?.map((grid) => ({
+                  ...grid,
+                  cells: grid.cells.map((cell) => ({ ...cell, photo: null })),
+                }));
+                handleUpdateActivePage({ cells: updatedCells, grids: updatedGrids });
                 showToast('Semua foto di halaman ini dikosongkan');
               }}
             />
@@ -655,6 +665,7 @@ export default function App() {
               onAddPhotos={handleAddPhotos}
               onRemovePhoto={handleRemovePhoto}
               onOpenAutoCollage={() => setIsAutoCollageOpen(true)}
+              onImportError={(message) => showToast(message, 'error')}
             />
           )}
           {activeSidebarTab === 'kop' && (
@@ -666,6 +677,7 @@ export default function App() {
                     kopSurat: { ...project.kopSurat, ...updated },
                   })
                 }
+                onImportError={(message) => showToast(message, 'error')}
               />
             </div>
           )}
@@ -714,6 +726,7 @@ export default function App() {
         onClose={() => setIsAutoCollageOpen(false)}
         availablePhotos={photos}
         onAddPhotosToGallery={handleAddPhotos}
+        onImportError={(message) => showToast(message, 'error')}
         onApplyCollage={handleApplyAutoCollage}
         activePageNumber={activePageIndex + 1}
         project={project}
@@ -747,6 +760,7 @@ export default function App() {
             handleDropPhotoToCell(photoPickerCellId, photo);
           }
         }}
+        onImportError={(message) => showToast(message, 'error')}
       />
     </div>
   );

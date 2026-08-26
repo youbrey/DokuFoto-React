@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { X, Image as ImageIcon, Upload, Plus } from 'lucide-react';
 import { PhotoMetadata } from '../types';
+import { readImageFile } from '../utils/imageFiles';
 
 interface PhotoPickerModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface PhotoPickerModalProps {
   photos: PhotoMetadata[];
   onSelectPhoto: (photo: PhotoMetadata) => void;
   onUploadAndSelect: (photo: PhotoMetadata) => void;
+  onImportError?: (message: string) => void;
 }
 
 export const PhotoPickerModal: React.FC<PhotoPickerModalProps> = ({
@@ -16,29 +18,21 @@ export const PhotoPickerModal: React.FC<PhotoPickerModalProps> = ({
   photos,
   onSelectPhoto,
   onUploadAndSelect,
+  onImportError,
 }) => {
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        const newPhoto: PhotoMetadata = {
-          id: 'photo-' + Date.now(),
-          name: file.name,
-          dataUrl: result,
-          capturedDate: new Date().toLocaleDateString('id-ID'),
-          category: 'Unggahan Langsung',
-        };
-        onUploadAndSelect(newPhoto);
-        onClose();
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      onUploadAndSelect(await readImageFile(file, 'Unggahan Langsung'));
+      onClose();
+    } catch (error) {
+      onImportError?.(error instanceof Error ? error.message : 'Foto gagal dibaca.');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   if (!isOpen) return null;
@@ -68,7 +62,7 @@ export const PhotoPickerModal: React.FC<PhotoPickerModalProps> = ({
           <input
             ref={uploadInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handleFileUpload}
           />

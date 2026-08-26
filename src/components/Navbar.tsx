@@ -13,6 +13,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { DocumentProject } from '../types';
+import { importProjectArchiveZip } from '../utils/zipExport';
+import { parseWorkspaceJson, type WorkspaceSnapshot } from '../utils/workspace';
 
 interface NavbarProps {
   project: DocumentProject;
@@ -24,7 +26,8 @@ interface NavbarProps {
   isExportingDocx: boolean;
   onOpenAutoCollage?: () => void;
   onSaveProjectJson?: () => void;
-  onLoadProjectJson?: (project: DocumentProject) => void;
+  onLoadWorkspace?: (workspace: WorkspaceSnapshot) => void;
+  onImportError?: (message: string) => void;
   onExportArchiveZip?: () => void;
 }
 
@@ -38,28 +41,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   isExportingDocx,
   onOpenAutoCollage,
   onSaveProjectJson,
-  onLoadProjectJson,
+  onLoadWorkspace,
+  onImportError,
   onExportArchiveZip,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOpenFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json && json.pages && onLoadProjectJson) {
-          onLoadProjectJson(json);
-        }
-      } catch (err) {
-        console.error('Gagal membaca file proyek:', err);
+    try {
+      if (file.size > 512 * 1024 * 1024) {
+        throw new Error('Berkas proyek melebihi batas 512 MB.');
       }
-    };
-    reader.readAsText(file);
-    if (e.target) e.target.value = '';
+      const workspace = file.name.toLowerCase().endsWith('.zip')
+        ? await importProjectArchiveZip(file)
+        : parseWorkspaceJson(await file.text());
+      onLoadWorkspace?.(workspace);
+    } catch (error) {
+      onImportError?.(
+        error instanceof Error ? error.message : 'Berkas proyek gagal dibuka.',
+      );
+    } finally {
+      e.target.value = '';
+    }
   };
 
   return (
@@ -120,14 +125,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,.dokufoto.json"
+            accept=".json,.dokufoto.json,.zip,application/json,application/zip"
             className="hidden"
             onChange={handleOpenFile}
           />
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-1.5 rounded-lg text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition"
-            title="Buka File Proyek (.dokufoto.json)"
+            title="Buka proyek DokuFoto (.json atau .zip)"
           >
             <FolderOpen className="w-4 h-4" />
           </button>
@@ -201,4 +206,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-

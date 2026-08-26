@@ -1,11 +1,12 @@
-import JSZip from 'jszip';
 import saveAs from 'file-saver';
 import { DocumentProject, PhotoMetadata } from '../types';
+import { deduplicatePhotos, parseWorkspaceJson, type WorkspaceSnapshot } from './workspace';
 
 export async function exportProjectArchiveZip(
   project: DocumentProject,
   photos: PhotoMetadata[]
 ): Promise<void> {
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const folder = zip.folder(`SetwanDokuFoto_${project.title.replace(/[^a-zA-Z0-9_-]/g, '_')}`) || zip;
 
@@ -41,7 +42,54 @@ Berkas ini adalah cadangan arsip proyek Setwan DokuFoto (React Vite).
 Anda dapat membuka kembali file 'project.dokufoto.json' langsung di aplikasi.`
   );
 
-  const content = await zip.generateAsync({ type: 'blob' });
+  const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
   saveAs(content, `${project.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Arsip.zip`);
 }
 
+const getImageMimeType = (filename: string): string => {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+};
+
+export async function importProjectArchiveZip(file: File): Promise<WorkspaceSnapshot> {
+  if (file.size > 512 * 1024 * 1024) {
+    throw new Error('Arsip ZIP melebihi batas 512 MB. Kurangi jumlah atau ukuran foto.');
+  }
+  const { default: JSZip } = await import('jszip');
+  const zip = await JSZip.loadAsync(file);
+  if (Object.keys(zip.files).length > 2000) {
+    throw new Error('Arsip ZIP berisi terlalu banyak berkas.');
+  }
+  const projectEntry = Object.values(zip.files).find(
+    (entry) =>
+      !entry.dir &&
+      (entry.name === 'project.dokufoto.json' || entry.name.endsWith('/project.dokufoto.json')),
+  );
+  if (!projectEntry) {
+    throw new Error('Arsip ZIP tidak berisi project.dokufoto.json.');
+  }
+
+  const workspace = parseWorkspaceJson(await projectEntry.async('string'));
+  const imageEntries = Object.values(zip.files).filter(
+    (entry) => !entry.dir && /\/media_foto\/.*\.(jpe?g|png|webp)$/i.test(entry.name),
+  );
+  const archivedPhotos = await Promise.all(
+    imageEntries.map(async (entry) => {
+      const filename = entry.name.split('/').pop() || 'foto-arsip.jpg';
+      const base64 = await entry.async('base64');
+      return {
+        id: `photo-${crypto.randomUUID()}`,
+        name: filename.replace(/^foto_\d+_/, ''),
+        dataUrl: `data:${getImageMimeType(filename)};base64,${base64}`,
+        category: 'Impor Arsip',
+      } satisfies PhotoMetadata;
+    }),
+  );
+
+  return {
+    ...workspace,
+    photos: deduplicatePhotos([...workspace.photos, ...archivedPhotos]),
+  };
+}
