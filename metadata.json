@@ -1,0 +1,6 @@
+{
+  "name": "Setwan DokuFoto",
+  "description": "Aplikasi Pembuat Kolase Foto dan Dokumen Laporan Dokumentasi Kegiatan Sekretariat Dewan (DPRD) dengan Ekspor DOCX, Pratinjau Cetak, Template Kolase, dan Pengaturan Margin Kertas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
