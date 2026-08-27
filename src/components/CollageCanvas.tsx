@@ -9,11 +9,15 @@ import {
   CropRect,
 } from '../types';
 import {
-  PAPER_DIMENSIONS,
-  COLLAGE_LAYOUTS,
   CANVA_LANDSCAPE_PLACEHOLDER,
   COLOR_PALETTES,
 } from '../utils/constants';
+import {
+  getDocumentGeometry,
+  getFloatingTextStyle,
+  getPageGrids,
+  getPhotoImageStyle,
+} from '../utils/pageVisual';
 import { FloatingTextToolbar } from './FloatingTextToolbar';
 import { GridFrameToolbar } from './GridFrameToolbar';
 import { CanvaPhotoCropper } from './CanvaPhotoCropper';
@@ -231,79 +235,22 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
   const [snapVertical, setSnapVertical] = useState(false);
   const [snapHorizontal, setSnapHorizontal] = useState(false);
 
-  const paperInfo = PAPER_DIMENSIONS[project.paperSize] || PAPER_DIMENSIONS.F4;
-  const isLandscape = project.orientation === 'landscape';
-
-  // Calculate paper physical dimension ratio
-  const widthMm = isLandscape ? paperInfo.heightMm : paperInfo.widthMm;
-  const heightMm = isLandscape ? paperInfo.widthMm : paperInfo.heightMm;
-  const aspectRatio = widthMm / heightMm;
-
-  // 1:1 Canonical Canvas Reference Dimensions (Identical to Print Pipeline)
-  // Portrait: Width 560px, Height Math.round(560 / aspectRatio)
-  // Landscape: Height 560px, Width Math.round(560 * aspectRatio)
-  const baseCanvasWidth = isLandscape ? Math.round(560 * aspectRatio) : 560;
-  const baseCanvasHeight = isLandscape ? 560 : Math.round(560 / aspectRatio);
-
-  const padTopPx = ((project.margins.top * 10) / heightMm) * baseCanvasHeight;
-  const padBottomPx = ((project.margins.bottom * 10) / heightMm) * baseCanvasHeight;
-  const padLeftPx = ((project.margins.left * 10) / widthMm) * baseCanvasWidth;
-  const padRightPx = ((project.margins.right * 10) / widthMm) * baseCanvasWidth;
+  const {
+    widthMm,
+    heightMm,
+    baseCanvasWidth,
+    baseCanvasHeight,
+    padTopPx,
+    padBottomPx,
+    padLeftPx,
+    padRightPx,
+  } = getDocumentGeometry(project);
 
   // Normalize Grids Array for active page
-  const pageGrids: CollageGridElement[] = React.useMemo(() => {
-    if (activePage.grids && activePage.grids.length > 0) {
-      return activePage.grids;
-    }
-    // Backward compatibility: construct primary grid from page.cells
-    const template =
-      COLLAGE_LAYOUTS.find((l) => l.id === activePage.layoutTemplateId) ||
-      COLLAGE_LAYOUTS[5];
-
-    // Compute intelligent initial height so it fits within margins
-    const headerH = project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0 ? 80 : 0;
-    const maxSafeH = Math.max(160, baseCanvasHeight - padTopPx - padBottomPx - headerH - 12);
-    const initialH = Math.min(maxSafeH, activePage.gridHeightPx || 340);
-
-    return [
-      {
-        id: 'grid-main-1',
-        x: 50,
-        y: 50,
-        widthPercent: activePage.gridWidthPercent || 82,
-        heightPx: initialH,
-        cols: activePage.customGridColumns || template.cols || 2,
-        rows: activePage.customGridRows || template.rows || 2,
-        gapMm: activePage.gridGapMm !== undefined ? activePage.gridGapMm : 3,
-        borderRadius:
-          activePage.cellBorderRadius !== undefined ? activePage.cellBorderRadius : 2,
-        borderWidth:
-          activePage.cellBorderWidth !== undefined ? activePage.cellBorderWidth : 1,
-        borderColor: activePage.cellBorderColor || '#94a3b8',
-        rotation: 0,
-        isLocked: false,
-        cells: activePage.cells,
-      },
-    ];
-  }, [
-    activePage.grids,
-    activePage.cells,
-    activePage.gridWidthPercent,
-    activePage.gridHeightPx,
-    activePage.customGridColumns,
-    activePage.customGridRows,
-    activePage.gridGapMm,
-    activePage.cellBorderRadius,
-    activePage.cellBorderWidth,
-    activePage.cellBorderColor,
-    activePage.layoutTemplateId,
-    activePage.showKopSurat,
-    activePageIndex,
-    baseCanvasHeight,
-    padBottomPx,
-    padTopPx,
-    project.kopSurat.enabled,
-  ]);
+  const pageGrids: CollageGridElement[] = React.useMemo(
+    () => getPageGrids(activePage, project, activePageIndex),
+    [activePage, activePageIndex, project],
+  );
 
   const activeGrid =
     pageGrids.find((g) => g.id === selectedGridId) ||
@@ -1155,9 +1102,9 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
           <div
             ref={paperRef}
             id="document-paper-sheet"
-            className={`bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] rounded-xs relative ${
+            className={`bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] relative ${
               croppingData ? 'overflow-visible' : 'overflow-hidden'
-            } flex-shrink-0 border border-slate-300/90 cursor-crosshair select-none`}
+            } flex-shrink-0 ring-1 ring-slate-300/90 cursor-crosshair select-none`}
             style={{
               width: `${baseCanvasWidth}px`,
               height: `${baseCanvasHeight}px`,
@@ -1599,7 +1546,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
                               isDragOver ? 'ring-2 ring-emerald-500 scale-[1.01]' : ''
                             }`}
                             style={{
-                              borderRadius: `${grid.borderRadius || 2}px`,
+                              borderRadius: `${grid.borderRadius ?? 2}px`,
                               borderWidth: `${grid.borderWidth !== undefined ? grid.borderWidth : 1}px`,
                               borderColor: grid.borderColor || '#94a3b8',
                               borderStyle: 'solid',
@@ -1647,26 +1594,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
                                   className={`select-none pointer-events-none transition-transform ${
                                     isCroppingThisCell ? 'opacity-0' : 'opacity-100'
                                   }`}
-                                  style={
-                                    cell.cropRect
-                                      ? {
-                                          position: 'absolute',
-                                          width: `${(1 / (cell.cropRect.width || 1)) * 100}%`,
-                                          height: `${(1 / (cell.cropRect.height || 1)) * 100}%`,
-                                          left: `${(-cell.cropRect.x / (cell.cropRect.width || 1)) * 100}%`,
-                                          top: `${(-cell.cropRect.y / (cell.cropRect.height || 1)) * 100}%`,
-                                          objectFit: 'cover',
-                                          transformOrigin: 'center center',
-                                          transform: `rotate(${cell.rotation || 0}deg)`,
-                                        }
-                                      : {
-                                          width: '100%',
-                                          height: '100%',
-                                          objectFit: 'cover',
-                                          transformOrigin: 'center center',
-                                          transform: `rotate(${cell.rotation || 0}deg)`,
-                                        }
-                                  }
+                                  style={getPhotoImageStyle(cell)}
                                 />
                               ) : (
                                 <div className="w-full h-full relative flex items-center justify-center">
@@ -2018,33 +1946,10 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
                       });
                     }}
                     style={{
+                      ...getFloatingTextStyle(ft),
                       userSelect: isSelected ? 'text' : 'none',
                       WebkitUserSelect: isSelected ? 'text' : 'none',
-                      fontFamily: ft.fontFamily || 'Arial',
-                      fontSize: `${ft.fontSize}px`,
-                      fontWeight:
-                        ft.fontWeight === '900'
-                          ? 900
-                          : ft.fontWeight === 'bold'
-                          ? 700
-                          : 400,
-                      fontStyle: ft.fontStyle || 'normal',
-                      textDecoration: ft.textDecoration || 'none',
-                      textTransform: ft.textTransform || 'none',
-                      textAlign: ft.textAlign || 'center',
-                      color: ft.color || '#000000',
-                      letterSpacing: ft.letterSpacing ? `${ft.letterSpacing}px` : undefined,
-                      lineHeight: ft.lineHeight || 1.2,
-                      opacity: ft.opacity !== undefined ? ft.opacity : 1,
                       outline: 'none',
-                      textShadow:
-                        ft.effect === 'shadow'
-                          ? '2px 4px 8px rgba(0, 0, 0, 0.4)'
-                          : undefined,
-                      WebkitTextStroke:
-                        ft.effect === 'outline'
-                          ? `${ft.strokeWidth || 1}px ${ft.effectColor || '#6366f1'}`
-                          : undefined,
                     }}
                   >
                     {ft.text}

@@ -7,6 +7,16 @@ interface PrintMarkupOptions {
   innerHtml: string;
 }
 
+export const createRasterPagesHtml = (pageDataUrls: string[]): string =>
+  pageDataUrls
+    .map(
+      (dataUrl, index) => `
+        <div class="print-single-page" data-page-number="${index + 1}">
+          <img class="print-page-image" src="${dataUrl}" alt="Halaman ${index + 1}">
+        </div>`,
+    )
+    .join('');
+
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (character) => {
     const entities: Record<string, string> = {
@@ -69,6 +79,12 @@ export const createPrintMarkup = ({
           .print-single-page:last-child {
             page-break-after: auto;
             break-after: auto;
+          }
+          .print-page-image {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
           }
           @media screen {
             body {

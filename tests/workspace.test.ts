@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultProject } from '../src/utils/constants';
 import { createProjectDocxBlob } from '../src/utils/docxExport';
-import { createPrintMarkup } from '../src/utils/printMarkup';
+import { createPrintMarkup, createRasterPagesHtml } from '../src/utils/printMarkup';
+import { getDocumentGeometry } from '../src/utils/pageVisual';
 import JSZip from 'jszip';
 import {
   createWorkspaceSnapshot,
@@ -54,7 +55,7 @@ describe('workspace files', () => {
     ).toEqual([photo]);
   });
 
-  it('exports each free text element exactly once in DOCX', async () => {
+  it('exports each page as one flattened WYSIWYG image in DOCX', async () => {
     const project = createDefaultProject();
     const token = 'TEKS-UNIK-TIDAK-BOLEH-DUPLIKAT';
     project.pages[0].floatingTexts = [
@@ -70,11 +71,27 @@ describe('workspace files', () => {
       },
     ];
 
-    const blob = await createProjectDocxBlob(project);
+    const pagePng =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=';
+    const blob = await createProjectDocxBlob(project, [
+      {
+        pageId: project.pages[0].id,
+        dataUrl: pagePng,
+        widthPx: 2480,
+        heightPx: 3508,
+      },
+    ]);
     const archive = await JSZip.loadAsync(await blob.arrayBuffer());
     const documentXml = await archive.file('word/document.xml')!.async('string');
+    const mediaFiles = Object.keys(archive.files).filter(
+      (path) => path.startsWith('word/media/') && !archive.files[path].dir,
+    );
 
-    expect(documentXml.match(new RegExp(token, 'g'))).toHaveLength(1);
+    expect(mediaFiles).toHaveLength(1);
+    expect(documentXml).toContain('<w:drawing>');
+    expect(documentXml).toContain('<wp:anchor');
+    expect(documentXml).not.toContain('<w:tbl>');
+    expect(documentXml).not.toContain(token);
   });
 
   it('does not create removed standard document sections', () => {
@@ -122,5 +139,32 @@ describe('workspace files', () => {
     expect(markup).not.toContain('330mm portrait');
     expect(markup).toContain('data:image/png;base64,AA==');
     expect(markup).toContain('.print-single-page:last-child');
+  });
+
+  it('uses complete rendered page images for print output', () => {
+    const pages = createRasterPagesHtml([
+      'data:image/png;base64,PAGE_ONE',
+      'data:image/png;base64,PAGE_TWO',
+    ]);
+
+    expect(pages.match(/class="print-single-page"/g)).toHaveLength(2);
+    expect(pages).toContain('data:image/png;base64,PAGE_ONE');
+    expect(pages).toContain('data:image/png;base64,PAGE_TWO');
+    expect(pages).toContain('class="print-page-image"');
+  });
+
+  it('uses custom paper geometry consistently in landscape', () => {
+    const project = createDefaultProject();
+    project.paperSize = 'Custom';
+    project.customWidthMm = 180;
+    project.customHeightMm = 260;
+    project.orientation = 'landscape';
+
+    const geometry = getDocumentGeometry(project);
+
+    expect(geometry.widthMm).toBe(260);
+    expect(geometry.heightMm).toBe(180);
+    expect(geometry.baseCanvasHeight).toBe(560);
+    expect(geometry.baseCanvasWidth).toBe(Math.round(560 * (260 / 180)));
   });
 });

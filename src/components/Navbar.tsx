@@ -196,7 +196,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onOpenDocxExport}
             disabled={isExportingDocx}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 shadow-md shadow-sky-900/40 border border-sky-400/30 transition disabled:opacity-50"
-            title="Ekspor langsung ke format Microsoft Word .docx asli"
+            title="Ekspor DOCX WYSIWYG: satu gambar halaman 300 DPI per lembar"
           >
             <Download className="w-3.5 h-3.5 text-white" />
             <span>{isExportingDocx ? 'Membuat...' : 'Ekspor .DOCX'}</span>
