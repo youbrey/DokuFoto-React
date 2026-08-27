@@ -262,8 +262,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
 
     // Compute intelligent initial height so it fits within margins
     const headerH = project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0 ? 80 : 0;
-    const titleH = activePage.showTitle && activePage.title ? 35 : 0;
-    const maxSafeH = Math.max(160, baseCanvasHeight - padTopPx - padBottomPx - headerH - titleH - 12);
+    const maxSafeH = Math.max(160, baseCanvasHeight - padTopPx - padBottomPx - headerH - 12);
     const initialH = Math.min(maxSafeH, activePage.gridHeightPx || 340);
 
     return [
@@ -299,8 +298,6 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
     activePage.cellBorderColor,
     activePage.layoutTemplateId,
     activePage.showKopSurat,
-    activePage.showTitle,
-    activePage.title,
     activePageIndex,
     baseCanvasHeight,
     padBottomPx,
@@ -568,8 +565,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
       project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0
         ? 80
         : 0;
-    const titleH = activePage.showTitle && activePage.title ? 35 : 0;
-    const topUsed = padTopPx + headerH + titleH;
+    const topUsed = padTopPx + headerH;
     const maxAvailableH = Math.max(140, baseCanvasHeight - topUsed - padBottomPx - 10);
     const optimalY = topUsed + maxAvailableH / 2;
     const optimalYPercent = Math.round((optimalY / baseCanvasHeight) * 100);
@@ -616,8 +612,7 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
       project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0
         ? 80
         : 0;
-    const titleH = activePage.showTitle && activePage.title ? 35 : 0;
-    const safeTop = padTopPx + headerH + titleH;
+    const safeTop = padTopPx + headerH;
     const safeBottom = baseCanvasHeight - padBottomPx;
     return pageGrids.some((g) => {
       const gridTop = (g.y / 100) * baseCanvasHeight - g.heightPx / 2;
@@ -632,8 +627,6 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
     project.kopSurat.enabled,
     activePage.showKopSurat,
     activePageIndex,
-    activePage.showTitle,
-    activePage.title,
   ]);
 
   const handleAddSlotToGrid = (gridId: string) => {
@@ -1309,20 +1302,6 @@ export const CollageCanvas: React.FC<CollageCanvasProps> = ({
               paddingRight: `${padRightPx}px`,
             }}
           >
-            {/* Optional Document Title (if enabled) */}
-            {activePage.showTitle && activePage.title && (
-              <div className="text-center mb-2.5 pointer-events-none">
-                <h2 className="text-xs font-black uppercase tracking-tight text-slate-900">
-                  {activePage.title}
-                </h2>
-                {activePage.subtitle && (
-                  <p className="text-[9.5px] italic font-semibold text-slate-700 mt-0.5">
-                    {activePage.subtitle}
-                  </p>
-                )}
-              </div>
-            )}
-
             {/* ========================================================= */}
             {/* FREEFORM DRAGGABLE & RESIZABLE PHOTO GRIDS */}
             {/* ========================================================= */}

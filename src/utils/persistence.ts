@@ -55,7 +55,7 @@ export const loadWorkspace = async (): Promise<WorkspaceSnapshot | null> => {
       request.onerror = () => reject(request.error ?? new Error('Proyek lokal gagal dibaca.'));
     });
     if (stored && isDocumentProject(stored.project) && Array.isArray(stored.photos)) {
-      return stored;
+      return createWorkspaceSnapshot(stored.project, stored.photos.filter(isPhotoMetadata));
     }
   } finally {
     database.close();

@@ -21,6 +21,7 @@ import {
   DocumentPage,
 } from '../types';
 import { PAPER_DIMENSIONS } from '../utils/constants';
+import { createPrintMarkup } from '../utils/printMarkup';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -58,18 +59,6 @@ const getPageGrids = (page?: DocumentPage): CollageGridElement[] => {
   return [];
 };
 
-const escapeHtml = (value: string): string =>
-  value.replace(/[&<>"']/g, (character) => {
-    const entities: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;',
-    };
-    return entities[character] ?? character;
-  });
-
 const collectLocalStyles = (): string =>
   Array.from(document.styleSheets)
     .map((styleSheet) => {
@@ -81,6 +70,29 @@ const collectLocalStyles = (): string =>
     })
     .join('\n');
 
+const waitForPrintAssets = async (printWindow: Window): Promise<void> => {
+  const printDocument = printWindow.document;
+  const imagePromises = Array.from(printDocument.images).map(async (image) => {
+    if (image.complete && image.naturalWidth > 0) return;
+
+    await new Promise<void>((resolve) => {
+      const finish = () => resolve();
+      image.addEventListener('load', finish, { once: true });
+      image.addEventListener('error', finish, { once: true });
+      window.setTimeout(finish, 10_000);
+    });
+  });
+
+  await Promise.all(imagePromises);
+  if (printDocument.fonts?.ready) await printDocument.fonts.ready;
+
+  await new Promise<void>((resolve) => {
+    printWindow.requestAnimationFrame(() => {
+      printWindow.requestAnimationFrame(() => resolve());
+    });
+  });
+};
+
 export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -90,6 +102,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   const [colorMode, setColorMode] = useState<'color' | 'mono'>('color');
   const [activePreviewPage, setActivePreviewPage] = useState<number>(0);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [printError, setPrintError] = useState<string | null>(null);
   const [previewZoom, setPreviewZoom] = useState<number>(90);
 
   const paperInfo = PAPER_DIMENSIONS[project.paperSize] || PAPER_DIMENSIONS.F4;
@@ -141,8 +154,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     if (!grids || grids.length === 0) return;
 
     const headerH = project.kopSurat.enabled && page.showKopSurat !== false && activePreviewPage === 0 ? 80 : 0;
-    const titleH = page.showTitle && page.title ? 35 : 0;
-    const topUsed = padTopPx + headerH + titleH;
+    const topUsed = padTopPx + headerH;
     const maxAvailableH = Math.max(140, baseCanvasHeight - topUsed - padBottomPx - 10);
     const optimalY = topUsed + maxAvailableH / 2;
     const optimalYPercent = Math.round((optimalY / baseCanvasHeight) * 100);
@@ -185,148 +197,52 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     onUpdateProject({ ...project, pages: updatedPages });
   };
 
-  const createPrintMarkup = (innerHtml: string): string => {
-    const safeTitle = escapeHtml(project.title || 'Dokumen Kolase Foto');
-    const safeFont = (project.fontFamily || 'Arial').replace(/[^a-zA-Z0-9 ,_-]/g, '');
-    return `
-      <!DOCTYPE html>
-      <html lang="id">
-        <head>
-          <meta charset="utf-8">
-          <title>${safeTitle}</title>
-          <style>
-            ${collectLocalStyles()}
-            @page {
-              size: ${widthMm}mm ${heightMm}mm ${isLandscape ? 'landscape' : 'portrait'};
-              margin: 0mm;
-            }
-            * {
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            html, body {
-              margin: 0 !important;
-              padding: 0 !important;
-              background: #ffffff !important;
-              width: 100%;
-              font-family: '${safeFont}', Arial, sans-serif;
-            }
-            .print-single-page {
-              width: ${widthMm}mm !important;
-              height: ${heightMm}mm !important;
-              page-break-after: always !important;
-              break-after: page !important;
-              position: relative !important;
-              overflow: hidden !important;
-              background: #ffffff !important;
-              box-sizing: border-box !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-          </style>
-        </head>
-        <body><div id="print-wrapper">${innerHtml}</div></body>
-      </html>
-    `;
-  };
-
   const handlePrint = () => {
+    // Dibuka langsung dari klik pengguna agar tidak dianggap pop-up otomatis.
+    const printWindow = window.open('', '_blank', 'popup=yes,width=1100,height=850');
+    if (!printWindow) {
+      setPrintError('Jendela cetak diblokir browser. Izinkan pop-up untuk alamat localhost ini, lalu coba lagi.');
+      return;
+    }
+
     setIsPrinting(true);
+    setPrintError(null);
 
     try {
-      // 1. Create a dedicated print iframe
-      const printIframe = document.createElement('iframe');
-      printIframe.name = 'print_frame';
-      printIframe.style.position = 'fixed';
-      printIframe.style.top = '-10000px';
-      printIframe.style.left = '-10000px';
-      printIframe.style.width = `${widthMm}mm`;
-      printIframe.style.height = `${heightMm}mm`;
-      printIframe.style.border = 'none';
-      printIframe.style.opacity = '0';
-      document.body.appendChild(printIframe);
-
-      // Collect HTML of all pages
       const printContainer = document.getElementById('print-all-pages-container');
-      const innerHtml = printContainer ? printContainer.innerHTML : '';
-
-      const printDocument = printIframe.contentWindow?.document;
-      if (printDocument) {
-        printDocument.open();
-        printDocument.write(createPrintMarkup(innerHtml));
-        printDocument.close();
-
-        // Wait for images inside the iframe to load before triggering print
-        const imgs = printDocument.querySelectorAll('img');
-        const imgPromises: Promise<void>[] = [];
-        imgs.forEach((img) => {
-          if (!img.complete) {
-            imgPromises.push(
-              new Promise((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-              })
-            );
-          }
-        });
-
-        const executePrintDialog = () => {
-          setTimeout(() => {
-            try {
-              printIframe.contentWindow?.focus();
-              printIframe.contentWindow?.print();
-            } catch (err) {
-              console.warn('Iframe print blocked, invoking window.print fallback:', err);
-              window.focus();
-              window.print();
-            } finally {
-              setIsPrinting(false);
-              setTimeout(() => {
-                if (document.body.contains(printIframe)) {
-                  document.body.removeChild(printIframe);
-                }
-              }, 4000);
-            }
-          }, 300);
-        };
-
-        if (imgPromises.length > 0) {
-          Promise.all(imgPromises).then(executePrintDialog).catch(executePrintDialog);
-        } else {
-          executePrintDialog();
-        }
-      } else {
-        // Fallback to window.print
-        window.focus();
-        window.print();
-        setIsPrinting(false);
+      if (!printContainer || !printContainer.innerHTML.trim()) {
+        printWindow.close();
+        throw new Error('Konten halaman cetak tidak ditemukan.');
       }
+
+      printWindow.document.open();
+      printWindow.document.write(
+        createPrintMarkup({
+          title: project.title,
+          fontFamily: project.fontFamily,
+          widthMm,
+          heightMm,
+          localStyles: collectLocalStyles(),
+          innerHtml: printContainer.innerHTML,
+        })
+      );
+      printWindow.document.close();
+
+      void waitForPrintAssets(printWindow)
+        .then(() => {
+          printWindow.focus();
+          printWindow.print();
+        })
+        .catch((error) => {
+          console.error('Print asset preparation error:', error);
+          setPrintError('Dokumen cetak tidak selesai dimuat. Tutup jendela cetak dan coba lagi.');
+        })
+        .finally(() => setIsPrinting(false));
     } catch (e) {
       console.error('Print trigger error:', e);
-      window.focus();
-      window.print();
+      if (!printWindow.closed) printWindow.close();
+      setPrintError(e instanceof Error ? e.message : 'Dokumen gagal disiapkan untuk dicetak.');
       setIsPrinting(false);
-    }
-  };
-
-  const handleOpenPrintWindow = () => {
-    try {
-      const printContainer = document.getElementById('print-all-pages-container');
-      const innerHtml = printContainer ? printContainer.innerHTML : '';
-      const newWin = window.open('', '_blank');
-      if (newWin) {
-        newWin.document.write(createPrintMarkup(innerHtml));
-        newWin.document.close();
-        window.setTimeout(() => {
-          newWin.focus();
-          newWin.print();
-        }, 500);
-      } else {
-        handlePrint();
-      }
-    } catch (err) {
-      handlePrint();
     }
   };
 
@@ -362,7 +278,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   };
 
   // Authoritative, pixel-perfect page content renderer (exact 1:1 match with canvas)
-  const renderPageContent = (page: DocumentPage, pageIndex: number, isPrintMode = false) => {
+  const renderPageContent = (page: DocumentPage) => {
     const grids = getPageGrids(page);
     const floatingTexts = page.floatingTexts || [];
 
@@ -382,33 +298,6 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
           overflow: 'hidden',
         }}
       >
-        {/* Static Document Title (Optional) */}
-        {page.showTitle && page.title && (
-          <div className="text-center mb-2.5 pointer-events-none">
-            <h2 className="text-xs font-black uppercase tracking-tight text-slate-900">
-              {page.title}
-            </h2>
-            {page.subtitle && (
-              <p className="text-[9.5px] italic font-semibold text-slate-700 mt-0.5">
-                {page.subtitle}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Optional Meta Table */}
-        {page.showMetaTable && page.metaTable && page.metaTable.length > 0 && (
-          <div className="text-[8.5px] mb-2 bg-slate-50 p-1.5 rounded border border-slate-200 pointer-events-none">
-            {page.metaTable.slice(0, 3).map((m, i) => (
-              <div key={i} className="flex gap-1">
-                <span className="w-20 font-bold text-slate-800">{m.label}</span>
-                <span>:</span>
-                <span className="flex-1 text-slate-700">{m.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Optional Activity Description */}
         {page.showDescription && page.activityDescription && (
           <p className="text-[8.5px] text-slate-700 mb-2 leading-relaxed pointer-events-none">
@@ -506,16 +395,6 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
           </div>
         ))}
 
-        {/* Signature Block (if enabled) */}
-        {page.showSignature && page.signatureBlock && (
-          <div className="absolute bottom-8 right-8 text-right text-[8.5px] pointer-events-none">
-            <p>{page.signatureBlock.cityAndDate}</p>
-            <p className="font-bold">{page.signatureBlock.roleTitle}</p>
-            <div className="h-8" />
-            <p className="font-bold underline">{page.signatureBlock.officerName}</p>
-            <p>{page.signatureBlock.nip}</p>
-          </div>
-        )}
       </div>
     );
   };
@@ -524,50 +403,6 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
   return (
     <>
-      {/* Injected Print Stylesheet for 1:1 Hardware Print & PDF Fidelity */}
-      <style>{`
-        @media print {
-          @page {
-            size: ${widthMm}mm ${heightMm}mm ${isLandscape ? 'landscape' : 'portrait'};
-            margin: 0mm;
-          }
-          html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #ffffff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #print-all-pages-container, #print-all-pages-container * {
-            visibility: visible;
-          }
-          #print-all-pages-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            display: block !important;
-          }
-          .print-single-page {
-            width: ${widthMm}mm !important;
-            height: ${heightMm}mm !important;
-            page-break-after: always !important;
-            break-after: page !important;
-            position: relative !important;
-            overflow: hidden !important;
-            box-sizing: border-box !important;
-            background: #ffffff !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-        }
-      `}</style>
-
       {/* Scaled Print Container for Hardware & PDF Output (Exact Pixel-to-Physical Scaling) */}
       <div id="print-all-pages-container" className="hidden print:block">
         {project.pages.map((page, idx) => (
@@ -598,7 +433,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                 background: '#ffffff',
               }}
             >
-              {renderPageContent(page, idx, true)}
+              {renderPageContent(page)}
             </div>
           </div>
         ))}
@@ -697,7 +532,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   transformOrigin: 'center center',
                 }}
               >
-                {renderPageContent(currentPage, activePreviewPage, false)}
+                {renderPageContent(currentPage)}
               </div>
 
               {/* Pagination Controls */}
@@ -733,9 +568,15 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                     Pemilihan Printer
                   </h4>
                   <p className="text-[11px] leading-relaxed text-sky-200/90">
-                    Pilih printer dan jumlah salinan melalui dialog cetak Windows yang muncul setelah menekan tombol cetak.
+                    Printer yang terpasang dideteksi oleh dialog cetak Windows. Pilih printer dan jumlah salinan setelah menekan tombol cetak.
                   </p>
                 </div>
+
+                {printError && (
+                  <div className="p-3 rounded-xl bg-red-950/60 border border-red-700 text-[11px] leading-relaxed text-red-200">
+                    {printError}
+                  </div>
+                )}
 
                 {/* Color Mode */}
                 <div className="space-y-1.5">
@@ -822,16 +663,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>{isPrinting ? 'Menyiapkan Dialog Cetak...' : 'Cetak Dokumen Sekarang'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenPrintWindow}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-sky-400 text-xs font-bold border border-slate-700 transition flex items-center justify-center gap-1.5"
-                  title="Gunakan ini jika dialog cetak browser utama tidak otomatis terbuka di iframe"
-                >
-                  <span>Buka di Tab/Jendela Cetak Terpisah</span>
+                  <span>{isPrinting ? 'Memuat Gambar untuk Dicetak...' : 'Buka Dialog Printer Windows'}</span>
                 </button>
 
                 <button

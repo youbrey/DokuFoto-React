@@ -11,13 +11,9 @@ import {
   BorderStyle,
   ImageRun,
   convertMillimetersToTwip,
-  PageBreak,
-  Header,
-  Footer,
-  PageNumber,
 } from 'docx';
 import saveAs from 'file-saver';
-import { DocumentProject, DocumentPage, CollageCell } from '../types';
+import { DocumentProject, CollageCell } from '../types';
 import { PAPER_DIMENSIONS } from './constants';
 
 // Convert an image URL / base64 / SVG to a Uint8Array PNG for docx ImageRun
@@ -72,7 +68,7 @@ async function imageUrlToBuffer(url: string): Promise<Uint8Array | null> {
   }
 }
 
-export async function exportProjectToDocx(project: DocumentProject): Promise<void> {
+export async function createProjectDocxBlob(project: DocumentProject): Promise<Blob> {
   const paperInfo = PAPER_DIMENSIONS[project.paperSize] || PAPER_DIMENSIONS.F4;
   const isLandscape = project.orientation === 'landscape';
 
@@ -85,133 +81,12 @@ export async function exportProjectToDocx(project: DocumentProject): Promise<voi
   const leftTwips = convertMillimetersToTwip(project.margins.left * 10);
   const rightTwips = convertMillimetersToTwip(project.margins.right * 10);
 
-  const usableWidthMm = pageWidthMm - (project.margins.left * 10 + project.margins.right * 10);
-
   const sections = [];
 
-  for (let pIndex = 0; pIndex < project.pages.length; pIndex++) {
-    const page = project.pages[pIndex];
+  for (const page of project.pages) {
     const children: (Paragraph | Table)[] = [];
 
-    // 1. Judul Dokumen / Laporan (Modular)
-    if (page.showTitle !== false && page.title) {
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 100, after: 60 },
-          children: [
-            new TextRun({
-              text: page.title.toUpperCase(),
-              font: project.fontFamily,
-              size: 26, // 13pt
-              bold: true,
-            }),
-          ],
-        })
-      );
-    }
-
-    if (page.showTitle !== false && page.subtitle) {
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 120 },
-          children: [
-            new TextRun({
-              text: page.subtitle,
-              font: project.fontFamily,
-              size: 22, // 11pt
-              bold: true,
-              italics: true,
-            }),
-          ],
-        })
-      );
-    }
-
-    // 3. Tabel Meta Data Kegiatan (Tanggal, Lokasi, Peserta)
-    if (page.showMetaTable !== false && page.metaTable && page.metaTable.length > 0) {
-      const metaRows = page.metaTable.map(
-        (meta) =>
-          new TableRow({
-            children: [
-              new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.NONE },
-                  bottom: { style: BorderStyle.NONE },
-                  left: { style: BorderStyle.NONE },
-                  right: { style: BorderStyle.NONE },
-                },
-                children: [
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: meta.label,
-                        font: project.fontFamily,
-                        size: 20, // 10pt
-                        bold: true,
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-              new TableCell({
-                width: { size: 5, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.NONE },
-                  bottom: { style: BorderStyle.NONE },
-                  left: { style: BorderStyle.NONE },
-                  right: { style: BorderStyle.NONE },
-                },
-                children: [
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: ':',
-                        font: project.fontFamily,
-                        size: 20,
-                        bold: true,
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-              new TableCell({
-                width: { size: 70, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.NONE },
-                  bottom: { style: BorderStyle.NONE },
-                  left: { style: BorderStyle.NONE },
-                  right: { style: BorderStyle.NONE },
-                },
-                children: [
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: meta.value,
-                        font: project.fontFamily,
-                        size: 20,
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-            ],
-          })
-      );
-
-      children.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: metaRows,
-        })
-      );
-
-      children.push(new Paragraph({ spacing: { after: 140 } }));
-    }
-
-    // 4. Floating Text Elements (Canva-style rich text boxes)
+    // Teks bebas diekspor tepat sekali, sebelum kisi foto.
     if (page.floatingTexts && page.floatingTexts.length > 0) {
       page.floatingTexts.forEach((ft) => {
         if (!ft.text) return;
@@ -377,123 +252,6 @@ export async function exportProjectToDocx(project: DocumentProject): Promise<voi
       );
     }
 
-    // 5b. Elemen Teks Bebas / Floating Texts
-    if (page.floatingTexts && page.floatingTexts.length > 0) {
-      for (const ft of page.floatingTexts) {
-        const alignType =
-          ft.textAlign === 'left'
-            ? AlignmentType.LEFT
-            : ft.textAlign === 'right'
-            ? AlignmentType.RIGHT
-            : ft.textAlign === 'justify'
-            ? AlignmentType.JUSTIFIED
-            : AlignmentType.CENTER;
-
-        const cleanColor = (ft.color || '#000000').replace('#', '');
-
-        children.push(
-          new Paragraph({
-            alignment: alignType,
-            spacing: { before: 120, after: 120 },
-            children: [
-              new TextRun({
-                text: ft.text,
-                font: ft.fontFamily || project.fontFamily,
-                size: Math.max(16, Math.round(ft.fontSize * 2)), // half-points in docx
-                bold: ft.fontWeight === 'bold' || ft.fontWeight === '900',
-                italics: ft.fontStyle === 'italic',
-                underline: ft.textDecoration === 'underline' ? {} : undefined,
-                strike: ft.textDecoration === 'line-through',
-                color: cleanColor.length === 6 ? cleanColor : '000000',
-              }),
-            ],
-          })
-        );
-      }
-    }
-
-    // 6. Blok Tanda Tangan Resmi (Signature Block)
-    if (page.signatureBlock && page.signatureBlock.enabled) {
-      children.push(new Paragraph({ spacing: { before: 180 } }));
-
-      const signatureTable = new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({
-                width: { size: 55, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.NONE },
-                  bottom: { style: BorderStyle.NONE },
-                  left: { style: BorderStyle.NONE },
-                  right: { style: BorderStyle.NONE },
-                },
-                children: [new Paragraph({ text: '' })],
-              }),
-              new TableCell({
-                width: { size: 45, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.NONE },
-                  bottom: { style: BorderStyle.NONE },
-                  left: { style: BorderStyle.NONE },
-                  right: { style: BorderStyle.NONE },
-                },
-                children: [
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                      new TextRun({
-                        text: page.signatureBlock.cityAndDate,
-                        font: project.fontFamily,
-                        size: 20,
-                      }),
-                    ],
-                  }),
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                      new TextRun({
-                        text: page.signatureBlock.roleTitle,
-                        font: project.fontFamily,
-                        size: 20,
-                        bold: true,
-                      }),
-                    ],
-                  }),
-                  new Paragraph({
-                    spacing: { before: 380, after: 0 },
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                      new TextRun({
-                        text: page.signatureBlock.officerName,
-                        font: project.fontFamily,
-                        size: 20,
-                        bold: true,
-                        underline: {},
-                      }),
-                    ],
-                  }),
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                      new TextRun({
-                        text: page.signatureBlock.nip,
-                        font: project.fontFamily,
-                        size: 18,
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
-      });
-
-      children.push(signatureTable);
-    }
-
     sections.push({
       properties: {
         page: {
@@ -521,7 +279,11 @@ export async function exportProjectToDocx(project: DocumentProject): Promise<voi
     sections,
   });
 
-  const blob = await Packer.toBlob(doc);
+  return Packer.toBlob(doc);
+}
+
+export async function exportProjectToDocx(project: DocumentProject): Promise<void> {
+  const blob = await createProjectDocxBlob(project);
   const safeFilename = `${project.title.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40)}_SetwanDokuFoto.docx`;
   saveAs(blob, safeFilename);
 }

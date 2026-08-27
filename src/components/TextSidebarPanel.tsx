@@ -7,41 +7,30 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Move,
-  RotateCw,
-  Palette,
-  Check,
   Layout,
-  Sliders,
 } from 'lucide-react';
-import { DocumentPage, FloatingTextElement, DocumentProject } from '../types';
-import { AVAILABLE_FONTS, COLOR_PALETTES } from '../utils/constants';
+import { DocumentPage, FloatingTextElement } from '../types';
 
 interface TextSidebarPanelProps {
   activePage: DocumentPage;
-  project: DocumentProject;
   selectedTextId: string | null;
   onSelectTextId: (id: string | null) => void;
   onAddFloatingText: (preset?: Partial<FloatingTextElement>) => void;
   onUpdateFloatingText: (id: string, updated: Partial<FloatingTextElement>) => void;
   onDeleteFloatingText: (id: string) => void;
   onUpdateActivePage: (updated: Partial<DocumentPage>) => void;
-  onUpdateProject: (updated: Partial<DocumentProject>) => void;
 }
 
 export const TextSidebarPanel: React.FC<TextSidebarPanelProps> = ({
   activePage,
-  project,
   selectedTextId,
   onSelectTextId,
   onAddFloatingText,
   onUpdateFloatingText,
   onDeleteFloatingText,
   onUpdateActivePage,
-  onUpdateProject,
 }) => {
   const floatingTexts = activePage.floatingTexts || [];
-  const selectedText = floatingTexts.find((t) => t.id === selectedTextId);
 
   return (
     <div className="p-4 space-y-6 text-slate-200">
@@ -221,14 +210,14 @@ export const TextSidebarPanel: React.FC<TextSidebarPanelProps> = ({
         )}
       </div>
 
-      {/* 3. Modular Page Sections Manager (No forced baku columns!) */}
+      {/* 3. Photo-grid visibility */}
       <div className="pt-4 border-t border-slate-800">
         <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
           <Layout className="w-3.5 h-3.5 text-sky-400" />
-          <span>Pengaturan Bagian Lembar (Modular)</span>
+          <span>Pengaturan Lembar</span>
         </label>
         <p className="text-[10px] text-slate-500 mb-3">
-          Aktifkan atau sembunyikan bagian apa pun sesuai kebutuhan Anda.
+          Tampilkan atau sembunyikan kisi foto pada halaman aktif.
         </p>
 
         <div className="space-y-2">
@@ -252,65 +241,6 @@ export const TextSidebarPanel: React.FC<TextSidebarPanelProps> = ({
             </button>
           </div>
 
-          {/* Judul Dokumen Standar */}
-          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-xs font-medium text-slate-300">Judul Dokumen Baku</span>
-            <button
-              onClick={() =>
-                onUpdateActivePage({
-                  showTitle: !activePage.showTitle,
-                })
-              }
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                activePage.showTitle
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {activePage.showTitle ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              <span>{activePage.showTitle ? 'Tampil' : 'Sembunyi'}</span>
-            </button>
-          </div>
-
-          {/* Tabel Informasi Baku */}
-          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-xs font-medium text-slate-300">Tabel Informasi / Jadwal</span>
-            <button
-              onClick={() =>
-                onUpdateActivePage({
-                  showMetaTable: !activePage.showMetaTable,
-                })
-              }
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                activePage.showMetaTable
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {activePage.showMetaTable ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              <span>{activePage.showMetaTable ? 'Tampil' : 'Sembunyi'}</span>
-            </button>
-          </div>
-
-          {/* Blok Tanda Tangan */}
-          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="text-xs font-medium text-slate-300">Blok Tanda Tangan Pejabat</span>
-            <button
-              onClick={() =>
-                onUpdateActivePage({
-                  showSignature: !activePage.showSignature,
-                })
-              }
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                activePage.showSignature
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {activePage.showSignature ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              <span>{activePage.showSignature ? 'Tampil' : 'Sembunyi'}</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

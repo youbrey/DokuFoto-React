@@ -191,9 +191,8 @@ export default function App() {
     const padTop = ((project.margins.top * 10) / totalH) * canvasH;
     const padBottom = ((project.margins.bottom * 10) / totalH) * canvasH;
     const headerH = project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0 ? 80 : 0;
-    const titleH = activePage.showTitle && activePage.title ? 35 : 0;
-    const maxSafeH = Math.max(140, canvasH - padTop - padBottom - headerH - titleH - 12);
-    const optimalY = Math.round(((padTop + headerH + titleH + maxSafeH / 2) / canvasH) * 100);
+    const maxSafeH = Math.max(140, canvasH - padTop - padBottom - headerH - 12);
+    const optimalY = Math.round(((padTop + headerH + maxSafeH / 2) / canvasH) * 100);
 
     const newGrid: CollageGridElement = {
       id: `grid-${Date.now()}`,
@@ -259,9 +258,8 @@ export default function App() {
     const padTop = ((project.margins.top * 10) / totalH) * canvasH;
     const padBottom = ((project.margins.bottom * 10) / totalH) * canvasH;
     const headerH = project.kopSurat.enabled && activePage.showKopSurat !== false && activePageIndex === 0 ? 80 : 0;
-    const titleH = activePage.showTitle && activePage.title ? 35 : 0;
-    const maxSafeH = Math.max(140, canvasH - padTop - padBottom - headerH - titleH - 12);
-    const optimalY = Math.round(((padTop + headerH + titleH + maxSafeH / 2) / canvasH) * 100);
+    const maxSafeH = Math.max(140, canvasH - padTop - padBottom - headerH - 12);
+    const optimalY = Math.round(((padTop + headerH + maxSafeH / 2) / canvasH) * 100);
 
     const newGrid: CollageGridElement = {
       id: `grid-custom-${Date.now()}`,
@@ -315,11 +313,9 @@ export default function App() {
       id: `page-${Date.now()}`,
       pageNumber: newPageNumber,
       title: `DOKUMENTASI FOTO KEGIATAN (BAGIAN ${newPageNumber})`,
-      subtitle: 'Sekretariat DPRD Kota Bitung',
       activityDate: activePage.activityDate,
       activityLocation: activePage.activityLocation,
       activityDescription: 'Lanjutan dokumentasi visual kegiatan sekretariat dewan.',
-      metaTable: [...(activePage.metaTable || [])],
       layoutTemplateId: 'grid-4-2x2',
       gridGapMm: 4,
       cellBorderWidth: 1,
@@ -328,15 +324,9 @@ export default function App() {
       cells: newCells,
       floatingTexts: [],
       showKopSurat: false, // Second pages usually don't need Kop Surat unless requested
-      showTitle: true,
-      showMetaTable: true,
       showDescription: false,
       showCollageGrid: true,
-      showSignature: true,
       showFooter: false,
-      signatureBlock: activePage.signatureBlock
-        ? { ...activePage.signatureBlock }
-        : undefined,
     };
 
     setProject((prev) => ({
@@ -509,7 +499,6 @@ export default function App() {
         id: `page-${Date.now()}`,
         pageNumber: project.pages.length + 1,
         title: titleText || 'DOKUMENTASI FOTO KEGIATAN',
-        subtitle: '',
         layoutTemplateId: 'grid-custom',
         cells: grid.cells,
         gridGapMm: grid.gapMm,
@@ -522,7 +511,6 @@ export default function App() {
         customGridRows: grid.rows,
         showCollageGrid: true,
         showKopSurat: false,
-        showTitle: !!titleText,
         grids: [grid],
         floatingTexts: titleText
           ? [
@@ -581,7 +569,6 @@ export default function App() {
         customGridColumns: grid.cols,
         customGridRows: grid.rows,
         floatingTexts: updatedFloatingTexts,
-        showTitle: titleText ? true : activePage.showTitle,
         title: titleText || activePage.title,
       });
       showToast('⚡ Kisi kolase foto berhasil diterapkan ke halaman!', 'success');
@@ -684,14 +671,12 @@ export default function App() {
           {activeSidebarTab === 'text' && (
             <TextSidebarPanel
               activePage={activePage}
-              project={project}
               selectedTextId={selectedTextId}
               onSelectTextId={setSelectedTextId}
               onAddFloatingText={handleAddFloatingText}
               onUpdateFloatingText={handleUpdateFloatingText}
               onDeleteFloatingText={handleDeleteFloatingText}
               onUpdateActivePage={handleUpdateActivePage}
-              onUpdateProject={handleUpdateProject}
             />
           )}
         </Sidebar>

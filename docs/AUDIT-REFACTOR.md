@@ -1,6 +1,8 @@
 # Audit dan Refactor DokuFoto React
 
-Tanggal audit: 26 Agustus 2026
+Tanggal audit awal: 26 Agustus 2026
+
+Audit cetak dan DOCX: 27 Agustus 2026
 
 ## Temuan yang diperbaiki
 
@@ -18,6 +20,11 @@ Tanggal audit: 26 Agustus 2026
 | Sedang | Dependensi AI/server/UI tidak digunakan | Instalasi lebih berat dan membingungkan untuk mode offline | Hapus dependensi yang tidak dipakai |
 | Rendah | Tes `.NET` merujuk project yang tidak ada | Folder tes tidak dapat dijalankan dan tidak relevan | Ganti dengan unit test TypeScript/Vitest |
 | Rendah | Server dev bind ke `0.0.0.0` | Aplikasi lokal terekspos ke LAN tanpa sengaja | Default ke `127.0.0.1`; sediakan `dev:lan` eksplisit |
+| Kritis | CSS cetak menyembunyikan seluruh `body`, tetapi ID yang seharusnya ditampilkan kembali tidak ikut disalin; halaman juga dibuat dalam iframe transparan di luar layar | Dialog printer menampilkan lembar putih meskipun pratinjau aplikasi berisi | Hapus aturan visibilitas lama; gunakan jendela cetak terlihat, tunggu gambar/font dan dua frame render, lalu panggil dialog Windows |
+| Tinggi | Aturan `@page size` menggabungkan dua ukuran fisik dengan kata orientasi | Deklarasi CSS tidak valid dan ukuran dapat diabaikan browser | Gunakan pasangan ukuran fisik `width height` yang valid |
+| Tinggi | Elemen teks bebas ditambahkan ke DOCX dua kali, sebelum dan sesudah tabel foto | Teks muncul di posisi atas dan bawah | Satu jalur ekspor teks, dengan tes yang membongkar `word/document.xml` dan menghitung kemunculan teks |
+| Sedang | Halaman terakhir selalu memakai `break-after: page` | Browser dapat menambahkan lembar kosong di akhir | Nonaktifkan page break pada halaman terakhir |
+| Sedang | Judul Dokumen Baku, Tabel Informasi, dan Blok Tanda Tangan tidak diperlukan | Antarmuka dan ekspor menjadi rumit serta memicu duplikasi judul | Hapus kontrol, renderer, model aktif, ekspor, dan bersihkan field lama saat proyek dimuat |
 
 ## Model data lokal
 
@@ -25,4 +32,4 @@ Proyek dan galeri foto disimpan sebagai satu `WorkspaceSnapshot` berversi. Index
 
 ## Batas platform
 
-Web browser dapat membaca file yang dipilih pengguna dan menghasilkan download tanpa server. Browser tidak dapat mengakses daftar printer Windows secara langsung. Dialog `window.print()` adalah jalur yang aman dan didukung untuk memilih printer, ukuran, warna, serta jumlah salinan.
+Web browser dapat membaca file yang dipilih pengguna dan menghasilkan download tanpa server. Browser tidak dapat mengakses daftar printer Windows secara langsung. Dialog `window.print()` adalah jalur yang aman dan didukung untuk mendeteksi serta memilih printer, ukuran, warna, dan jumlah salinan melalui Windows.

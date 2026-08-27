@@ -72,7 +72,9 @@ Setelah `npm ci` selesai dan dependensi sudah ada di komputer, fitur utama dapat
 
 Istilah **unggah** pada antarmuka berarti membaca file dari disk ke memori browser lokal. File tidak dikirim ke server maupun layanan internet. Istilah **unduh** berarti browser menyimpan Blob yang dibuat secara lokal ke disk.
 
-Browser tidak mengizinkan aplikasi web mendeteksi nama/status printer. Printer dan jumlah salinan dipilih melalui dialog cetak sistem Windows. Ini adalah batas keamanan browser, bukan keterbatasan koneksi internet.
+Browser tidak mengizinkan aplikasi web XAMPP mendeteksi nama/status printer secara langsung. Tombol **Buka Dialog Printer Windows** membuat halaman cetak yang terlihat, menunggu seluruh gambar dan font selesai dimuat, lalu membuka dialog sistem. Daftar printer, status perangkat, ukuran kertas, dan jumlah salinan berasal dari Windows. Izinkan pop-up untuk `localhost` bila browser memblokir jendela cetak.
+
+Fitur Judul Dokumen Baku, Tabel Informasi, dan Blok Tanda Tangan telah dihapus. Judul atau keterangan tetap dapat dibuat dengan **Teks Bebas**, sehingga posisinya dapat diatur langsung pada kanvas dan tidak digandakan saat ekspor DOCX.
 
 ## Perintah proyek
 
