@@ -8,6 +8,9 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(() => {
   return {
+    // Keep production asset URLs relative so the build also works from an
+    // Apache/XAMPP subfolder such as http://localhost/DokuFoto/.
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

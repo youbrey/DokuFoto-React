@@ -30,6 +30,33 @@ npm run preview
 
 Hasil build berada di folder `dist` dan pratinjau tersedia di `http://127.0.0.1:4173`.
 
+## Menjalankan build dengan XAMPP
+
+XAMPP hanya dipakai sebagai server web lokal (Apache). PHP dan MySQL tidak diperlukan karena DokuFoto adalah aplikasi web statis dan seluruh pemrosesan dilakukan di browser.
+
+1. Buka folder proyek di VS Code, lalu jalankan instalasi dependensi dan build:
+
+   ```powershell
+   npm ci
+   npm run build
+   ```
+
+2. Buat folder tujuan di XAMPP dan salin **isi** folder `dist` ke sana:
+
+   ```powershell
+   New-Item -ItemType Directory -Force C:\xampp\htdocs\DokuFoto
+   Copy-Item -Path .\dist\* -Destination C:\xampp\htdocs\DokuFoto -Recurse -Force
+   ```
+
+3. Buka XAMPP Control Panel dan klik **Start** pada Apache.
+4. Buka `http://localhost/DokuFoto/` di browser. Jika Apache menggunakan port 8080, buka `http://localhost:8080/DokuFoto/`.
+
+Jangan membuka `dist/index.html` dengan klik ganda (`file://`). Jalankan melalui Apache agar perilakunya konsisten. Saat kode berubah, jalankan kembali `npm run build`, lalu ganti isi folder `C:\xampp\htdocs\DokuFoto` dengan isi `dist` yang baru.
+
+Instalasi awal `npm ci` memerlukan internet untuk mengambil paket yang belum tersedia. Setelah dependensi terpasang dan build selesai, XAMPP serta fitur impor/ekspor gambar dapat dijalankan tanpa internet.
+
+Data autosave IndexedDB terikat pada alamat situs (origin). Data di `http://127.0.0.1:3000` tidak otomatis muncul di `http://localhost/DokuFoto/`. Sebelum berpindah alamat, ekspor proyek sebagai `.dokufoto.json` atau `.zip`, lalu impor kembali dari versi XAMPP. Aplikasi saat ini tidak memakai client-side routing, sehingga konfigurasi `.htaccess` tidak diperlukan.
+
 ## Operasi offline
 
 Setelah `npm ci` selesai dan dependensi sudah ada di komputer, fitur utama dapat dipakai tanpa internet:
