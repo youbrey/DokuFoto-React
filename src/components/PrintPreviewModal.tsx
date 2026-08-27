@@ -328,6 +328,10 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   <p className="text-[11px] leading-relaxed text-sky-200/90">
                     Printer yang terpasang dideteksi oleh dialog cetak Windows. Pilih printer dan jumlah salinan setelah menekan tombol cetak.
                   </p>
+                  <p className="mt-2 text-[11px] leading-relaxed font-semibold text-amber-200">
+                    Di dialog cetak, pilih {paperInfo.name}, Skala 100%/Ukuran sebenarnya,
+                    lalu nonaktifkan Fit atau Shrink agar driver tidak mengubah ukuran halaman.
+                  </p>
                 </div>
 
                 <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/80">
