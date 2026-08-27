@@ -2,26 +2,19 @@ import React, { useState, useEffect } from 'react';
 import {
   Printer,
   X,
-  AlertCircle,
-  Copy,
   Settings,
   ChevronLeft,
   ChevronRight,
   Eye,
-  FileCheck,
-  Image as ImageIcon,
   ZoomIn,
   ZoomOut,
-  Maximize2,
 } from 'lucide-react';
-import {
-  DocumentProject,
-  FloatingTextElement,
-  CollageGridElement,
-  DocumentPage,
-} from '../types';
+import { DocumentProject, CollageGridElement, DocumentPage } from '../types';
 import { PAPER_DIMENSIONS } from '../utils/constants';
-import { createPrintMarkup } from '../utils/printMarkup';
+import { createPrintMarkup, createRasterPagesHtml } from '../utils/printMarkup';
+import { getDocumentGeometry, getPageGrids } from '../utils/pageVisual';
+import { renderProjectPagesToPng } from '../utils/pageRender';
+import { DocumentPageView } from './DocumentPageView';
 
 interface PrintPreviewModalProps {
   isOpen: boolean;
@@ -29,46 +22,6 @@ interface PrintPreviewModalProps {
   project: DocumentProject;
   onUpdateProject?: (project: DocumentProject) => void;
 }
-
-// Module-level helper to extract grids for a given page
-const getPageGrids = (page?: DocumentPage): CollageGridElement[] => {
-  if (!page) return [];
-  if (page.grids && page.grids.length > 0) {
-    return page.grids;
-  }
-  if (page.cells && page.cells.length > 0) {
-    return [
-      {
-        id: 'grid-default-preview',
-        x: 50,
-        y: 50,
-        widthPercent: page.gridWidthPercent || 80,
-        heightPx: page.gridHeightPx || 340,
-        cols: page.customGridColumns || 2,
-        rows: page.customGridRows || 2,
-        gapMm: page.gridGapMm !== undefined ? page.gridGapMm : 3,
-        borderRadius: page.cellBorderRadius !== undefined ? page.cellBorderRadius : 2,
-        borderWidth: page.cellBorderWidth !== undefined ? page.cellBorderWidth : 1,
-        borderColor: page.cellBorderColor || '#cbd5e1',
-        rotation: 0,
-        isLocked: false,
-        cells: page.cells,
-      },
-    ];
-  }
-  return [];
-};
-
-const collectLocalStyles = (): string =>
-  Array.from(document.styleSheets)
-    .map((styleSheet) => {
-      try {
-        return Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join('\n');
-      } catch {
-        return '';
-      }
-    })
-    .join('\n');
 
 const waitForPrintAssets = async (printWindow: Window): Promise<void> => {
   const printDocument = printWindow.document;
@@ -107,22 +60,16 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
   const paperInfo = PAPER_DIMENSIONS[project.paperSize] || PAPER_DIMENSIONS.F4;
   const isLandscape = project.orientation === 'landscape';
-  const widthMm = isLandscape ? paperInfo.heightMm : paperInfo.widthMm;
-  const heightMm = isLandscape ? paperInfo.widthMm : paperInfo.heightMm;
-  const aspectRatio = widthMm / heightMm;
-
-  // Base canvas coordinate dimensions matching CollageCanvas 1:1
-  const baseCanvasWidth = isLandscape ? Math.round(560 * aspectRatio) : 560;
-  const baseCanvasHeight = isLandscape ? 560 : Math.round(560 / aspectRatio);
-
-  // Exact scale factor from 560px canonical canvas to physical print page (96 DPI: 1mm = 3.779527559px)
-  const printScale = (widthMm * 3.779527559) / baseCanvasWidth;
-
-  // Exact proportional padding matching real paper margins
-  const padLeftPx = (project.margins.left * 10 / widthMm) * baseCanvasWidth;
-  const padRightPx = (project.margins.right * 10 / widthMm) * baseCanvasWidth;
-  const padTopPx = (project.margins.top * 10 / heightMm) * baseCanvasHeight;
-  const padBottomPx = (project.margins.bottom * 10 / heightMm) * baseCanvasHeight;
+  const {
+    widthMm,
+    heightMm,
+    baseCanvasWidth,
+    baseCanvasHeight,
+    padLeftPx,
+    padRightPx,
+    padTopPx,
+    padBottomPx,
+  } = getDocumentGeometry(project);
 
   // Auto calculate comfortable zoom on open
   useEffect(() => {
@@ -138,7 +85,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   const isCurrentPageOverflowing = React.useMemo(() => {
     const page = project.pages[activePreviewPage] || project.pages[0];
     if (!page) return false;
-    const grids = getPageGrids(page);
+    const grids = getPageGrids(page, project, activePreviewPage);
     const safeBottom = baseCanvasHeight - padBottomPx;
     return grids.some((g) => {
       const gridBottom = (g.y / 100) * baseCanvasHeight + g.heightPx / 2;
@@ -150,7 +97,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     if (!onUpdateProject) return;
     const page = project.pages[activePreviewPage];
     if (!page) return;
-    const grids = getPageGrids(page);
+    const grids = getPageGrids(page, project, activePreviewPage);
     if (!grids || grids.length === 0) return;
 
     const headerH = project.kopSurat.enabled && page.showKopSurat !== false && activePreviewPage === 0 ? 80 : 0;
@@ -208,238 +155,49 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
     setIsPrinting(true);
     setPrintError(null);
 
-    try {
-      const printContainer = document.getElementById('print-all-pages-container');
-      if (!printContainer || !printContainer.innerHTML.trim()) {
-        printWindow.close();
-        throw new Error('Konten halaman cetak tidak ditemukan.');
-      }
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!doctype html><html lang="id"><meta charset="utf-8"><title>Menyiapkan cetak</title><body style="font:16px Arial;padding:32px">Merender halaman 300 DPI…</body></html>',
+    );
+    printWindow.document.close();
 
-      printWindow.document.open();
-      printWindow.document.write(
-        createPrintMarkup({
-          title: project.title,
-          fontFamily: project.fontFamily,
-          widthMm,
-          heightMm,
-          localStyles: collectLocalStyles(),
-          innerHtml: printContainer.innerHTML,
-        })
-      );
-      printWindow.document.close();
-
-      void waitForPrintAssets(printWindow)
+    void renderProjectPagesToPng(project, { colorMode, dpi: 300 })
+      .then((renderedPages) => {
+        printWindow.document.open();
+        printWindow.document.write(
+          createPrintMarkup({
+            title: project.title,
+            fontFamily: project.fontFamily,
+            widthMm,
+            heightMm,
+            localStyles: '',
+            innerHtml: createRasterPagesHtml(renderedPages.map((page) => page.dataUrl)),
+          }),
+        );
+        printWindow.document.close();
+        return waitForPrintAssets(printWindow);
+      })
         .then(() => {
           printWindow.focus();
           printWindow.print();
         })
         .catch((error) => {
           console.error('Print asset preparation error:', error);
-          setPrintError('Dokumen cetak tidak selesai dimuat. Tutup jendela cetak dan coba lagi.');
+          setPrintError(
+            error instanceof Error
+              ? `Dokumen cetak gagal dirender: ${error.message}`
+              : 'Dokumen cetak tidak selesai dimuat. Tutup jendela cetak dan coba lagi.',
+          );
         })
         .finally(() => setIsPrinting(false));
-    } catch (e) {
-      console.error('Print trigger error:', e);
-      if (!printWindow.closed) printWindow.close();
-      setPrintError(e instanceof Error ? e.message : 'Dokumen gagal disiapkan untuk dicetak.');
-      setIsPrinting(false);
-    }
   };
 
   const currentPage: DocumentPage = project.pages[activePreviewPage] || project.pages[0];
 
-  const getTextEffectStyle = (textEl: FloatingTextElement): React.CSSProperties => {
-    const style: React.CSSProperties = {
-      fontFamily: textEl.fontFamily || 'Arial',
-      fontSize: `${textEl.fontSize}px`,
-      fontWeight: textEl.fontWeight === '900' ? 900 : textEl.fontWeight === 'bold' ? 700 : 400,
-      fontStyle: textEl.fontStyle || 'normal',
-      textDecoration: textEl.textDecoration || 'none',
-      textTransform: textEl.textTransform || 'none',
-      textAlign: textEl.textAlign || 'center',
-      color: colorMode === 'mono' ? '#000000' : textEl.color || '#000000',
-      letterSpacing: textEl.letterSpacing ? `${textEl.letterSpacing}px` : undefined,
-      lineHeight: textEl.lineHeight || 1.2,
-      opacity: textEl.opacity !== undefined ? textEl.opacity : 1,
-    };
-
-    if (textEl.effect === 'shadow') {
-      style.textShadow = '2px 4px 8px rgba(0, 0, 0, 0.4)';
-    } else if (textEl.effect === 'outline') {
-      const strokeCol = textEl.effectColor || '#6366f1';
-      style.WebkitTextStroke = `${textEl.strokeWidth || 1}px ${strokeCol}`;
-    } else if (textEl.effect === 'background') {
-      style.backgroundColor = textEl.effectColor || '#fef08a';
-      style.padding = '2px 6px';
-      style.borderRadius = '4px';
-    }
-
-    return style;
-  };
-
-  // Authoritative, pixel-perfect page content renderer (exact 1:1 match with canvas)
-  const renderPageContent = (page: DocumentPage) => {
-    const grids = getPageGrids(page);
-    const floatingTexts = page.floatingTexts || [];
-
-    return (
-      <div
-        className="w-full h-full relative"
-        style={{
-          width: `${baseCanvasWidth}px`,
-          height: `${baseCanvasHeight}px`,
-          boxSizing: 'border-box',
-          paddingTop: `${padTopPx}px`,
-          paddingBottom: `${padBottomPx}px`,
-          paddingLeft: `${padLeftPx}px`,
-          paddingRight: `${padRightPx}px`,
-          fontFamily: project.fontFamily || 'Arial',
-          backgroundColor: '#ffffff',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Optional Activity Description */}
-        {page.showDescription && page.activityDescription && (
-          <p className="text-[8.5px] text-slate-700 mb-2 leading-relaxed pointer-events-none">
-            {page.activityDescription}
-          </p>
-        )}
-
-        {/* Freeform Draggable/Positioned Grids (Matching Canvas Pixel-Perfect) */}
-        {page.showCollageGrid !== false &&
-          grids.map((grid) => {
-            const cols = grid.cols || 2;
-            const rows = grid.rows || Math.max(1, Math.ceil(grid.cells.length / cols));
-            const gridGap = grid.gapMm !== undefined ? grid.gapMm : 3;
-
-            return (
-              <div
-                key={grid.id}
-                className="absolute select-none overflow-hidden"
-                style={{
-                  left: `${grid.x}%`,
-                  top: `${grid.y}%`,
-                  width: `${grid.widthPercent}%`,
-                  height: `${grid.heightPx}px`,
-                  transform: `translate(-50%, -50%) rotate(${grid.rotation || 0}deg)`,
-                }}
-              >
-                <div
-                  className="w-full h-full grid"
-                  style={{
-                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-                    gap: `${gridGap}px`,
-                  }}
-                >
-                  {grid.cells.map((cell, cIdx) => (
-                    <div
-                      key={cell.id || cIdx}
-                      className="relative overflow-hidden flex flex-col justify-between"
-                      style={{
-                        gridColumn: cell.colSpan ? `span ${cell.colSpan}` : undefined,
-                        gridRow: cell.rowSpan ? `span ${cell.rowSpan}` : undefined,
-                        borderRadius: `${grid.borderRadius !== undefined ? grid.borderRadius : 2}px`,
-                        borderWidth: `${grid.borderWidth !== undefined ? grid.borderWidth : 1}px`,
-                        borderColor: grid.borderColor || '#cbd5e1',
-                        borderStyle: grid.borderWidth && grid.borderWidth > 0 ? 'solid' : 'none',
-                        backgroundColor: '#f8fafc',
-                      }}
-                    >
-                      {cell.photo ? (
-                        <div className="w-full h-full relative overflow-hidden flex-1 bg-slate-100 flex items-center justify-center">
-                          <img
-                            src={cell.photo.dataUrl}
-                            alt=""
-                            className="w-full h-full object-cover select-none pointer-events-none"
-                            style={{
-                              transform: `rotate(${cell.rotation || 0}deg)`,
-                              clipPath: cell.cropRect
-                                ? `inset(${cell.cropRect.y * 100}% ${(1 - cell.cropRect.x - cell.cropRect.width) * 100}% ${(1 - cell.cropRect.y - cell.cropRect.height) * 100}% ${cell.cropRect.x * 100}%)`
-                                : undefined,
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full h-full bg-slate-100/90 flex flex-col items-center justify-center p-1 text-slate-400">
-                          <ImageIcon className="w-4 h-4 text-slate-300 mb-0.5" />
-                          <span className="text-[8px] font-bold">[Slot Foto {cIdx + 1}]</span>
-                        </div>
-                      )}
-
-                      {cell.showCaption && cell.caption && (
-                        <div className="bg-white/95 px-1 py-0.5 border-t border-slate-200 text-[8px] text-slate-800 text-center font-medium line-clamp-1">
-                          {cell.caption}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-        {/* Freeform Floating Text Elements (Matching Canvas Pixel-Perfect) */}
-        {floatingTexts.map((ft) => (
-          <div
-            key={ft.id}
-            className="absolute pointer-events-none select-none"
-            style={{
-              left: `${ft.x}%`,
-              top: `${ft.y}%`,
-              transform: `translate(-50%, -50%) rotate(${ft.rotation || 0}deg)`,
-              width: ft.width ? `${ft.width}px` : 'auto',
-            }}
-          >
-            <div style={getTextEffectStyle(ft)}>{ft.text}</div>
-          </div>
-        ))}
-
-      </div>
-    );
-  };
-
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Scaled Print Container for Hardware & PDF Output (Exact Pixel-to-Physical Scaling) */}
-      <div id="print-all-pages-container" className="hidden print:block">
-        {project.pages.map((page, idx) => (
-          <div
-            key={page.id || idx}
-            className={`print-single-page ${
-              colorMode === 'mono' ? 'grayscale contrast-125' : ''
-            }`}
-            style={{
-              width: `${widthMm}mm`,
-              height: `${heightMm}mm`,
-              position: 'relative',
-              overflow: 'hidden',
-              background: '#ffffff',
-            }}
-          >
-            {/* Exactly Scaled Canonical Canvas Element */}
-            <div
-              style={{
-                width: `${baseCanvasWidth}px`,
-                height: `${baseCanvasHeight}px`,
-                transform: `scale(${printScale})`,
-                transformOrigin: 'top left',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                overflow: 'hidden',
-                background: '#ffffff',
-              }}
-            >
-              {renderPageContent(page)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Screen Interactive Modal */}
+      /* Screen Interactive Modal */
       <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 no-print">
         <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-6xl w-full h-[94vh] flex flex-col overflow-hidden border border-slate-800 animate-in zoom-in-95 duration-150 text-white">
           {/* Header */}
@@ -521,7 +279,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
               {/* Visual Paper Replica (Matching Canvas Perfectly) */}
               <div
-                className={`bg-white text-slate-900 shadow-2xl rounded-xs relative overflow-hidden transition-transform select-none ${
+                className={`bg-white text-slate-900 shadow-2xl relative overflow-hidden transition-transform select-none ${
                   colorMode === 'mono' ? 'grayscale contrast-125' : ''
                 }`}
                 style={{
@@ -532,7 +290,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   transformOrigin: 'center center',
                 }}
               >
-                {renderPageContent(currentPage)}
+                <DocumentPageView project={project} page={currentPage} />
               </div>
 
               {/* Pagination Controls */}
@@ -569,6 +327,17 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   </h4>
                   <p className="text-[11px] leading-relaxed text-sky-200/90">
                     Printer yang terpasang dideteksi oleh dialog cetak Windows. Pilih printer dan jumlah salinan setelah menekan tombol cetak.
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed font-semibold text-amber-200">
+                    Di dialog cetak, pilih {paperInfo.name}, Skala 100%/Ukuran sebenarnya,
+                    lalu nonaktifkan Fit atau Shrink agar driver tidak mengubah ukuran halaman.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/80">
+                  <p className="text-[11px] leading-relaxed text-emerald-200/90">
+                    Cetak dan DOCX memakai gambar halaman 300 DPI dari renderer yang sama dengan
+                    pratinjau ini. Posisi, crop, ukuran kisi, dan teks tidak dibangun ulang.
                   </p>
                 </div>
 
@@ -663,7 +432,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>{isPrinting ? 'Memuat Gambar untuk Dicetak...' : 'Buka Dialog Printer Windows'}</span>
+                  <span>{isPrinting ? 'Merender Halaman 300 DPI...' : 'Buka Dialog Printer Windows'}</span>
                 </button>
 
                 <button
@@ -677,6 +446,5 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
           </div>
         </div>
       </div>
-    </>
   );
 };

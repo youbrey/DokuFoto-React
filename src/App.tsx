@@ -32,6 +32,7 @@ import { PaperMarginModal } from './components/PaperMarginModal';
 import { PrintPreviewModal } from './components/PrintPreviewModal';
 import { PhotoPickerModal } from './components/PhotoPickerModal';
 import { AutoCollageModal } from './components/AutoCollageModal';
+import { DocumentOutputHost } from './components/DocumentOutputHost';
 import saveAs from 'file-saver';
 
 export default function App() {
@@ -471,7 +472,7 @@ export default function App() {
     try {
       const { exportProjectToDocx } = await import('./utils/docxExport');
       await exportProjectToDocx(project);
-      showToast('Dokumen .docx berhasil diekspor dan siap dibuka di Microsoft Word!');
+      showToast('DOCX WYSIWYG 300 DPI berhasil diekspor dan siap dibuka di Microsoft Word!');
     } catch (err) {
       console.error('Docx export error:', err);
       showToast('Gagal mengekspor dokumen .docx. Silakan coba lagi.', 'error');
@@ -577,6 +578,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      <DocumentOutputHost project={project} />
       {/* Toast Notification */}
       {notification && (
         <div

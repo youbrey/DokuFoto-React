@@ -17,6 +17,7 @@
   "dependencies": {
     "docx": "^9.7.1",
     "file-saver": "^2.0.5",
+    "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "react": "^19.0.1",

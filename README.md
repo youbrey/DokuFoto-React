@@ -74,7 +74,11 @@ Istilah **unggah** pada antarmuka berarti membaca file dari disk ke memori brows
 
 Browser tidak mengizinkan aplikasi web XAMPP mendeteksi nama/status printer secara langsung. Tombol **Buka Dialog Printer Windows** membuat halaman cetak yang terlihat, menunggu seluruh gambar dan font selesai dimuat, lalu membuka dialog sistem. Daftar printer, status perangkat, ukuran kertas, dan jumlah salinan berasal dari Windows. Izinkan pop-up untuk `localhost` bila browser memblokir jendela cetak.
 
-Fitur Judul Dokumen Baku, Tabel Informasi, dan Blok Tanda Tangan telah dihapus. Judul atau keterangan tetap dapat dibuat dengan **Teks Bebas**, sehingga posisinya dapat diatur langsung pada kanvas dan tidak digandakan saat ekspor DOCX.
+Pada dialog cetak, pilih ukuran kertas yang sama dengan proyek dan gunakan skala **100% / Actual size**. Nonaktifkan opsi **Fit**, **Shrink**, atau penyesuaian halaman lain agar Chrome/driver printer tidak menskalakan ulang gambar halaman.
+
+Cetak dan DOCX memakai renderer WYSIWYG yang sama dengan pratinjau aplikasi. Setiap halaman diraster menjadi PNG 300 DPI, lalu gambar halaman yang identik dikirim ke jendela cetak atau ditempatkan penuh pada halaman Word. Posisi, ukuran, crop, rotasi, grid, teks, warna, dan margin karena itu tidak dibangun ulang oleh Word. Konsekuensinya, teks dan foto di dalam DOCX tidak dapat diedit sebagai elemen Word terpisah; untuk mengubah isi, edit proyek DokuFoto lalu ekspor kembali.
+
+Fitur Judul Dokumen Baku, Tabel Informasi, dan Blok Tanda Tangan telah dihapus. Judul atau keterangan tetap dapat dibuat dengan **Teks Bebas**, sehingga posisi akhirnya ditentukan langsung pada kanvas.
 
 ## Perintah proyek
 

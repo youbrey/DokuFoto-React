@@ -25,6 +25,9 @@ Audit cetak dan DOCX: 27 Agustus 2026
 | Tinggi | Elemen teks bebas ditambahkan ke DOCX dua kali, sebelum dan sesudah tabel foto | Teks muncul di posisi atas dan bawah | Satu jalur ekspor teks, dengan tes yang membongkar `word/document.xml` dan menghitung kemunculan teks |
 | Sedang | Halaman terakhir selalu memakai `break-after: page` | Browser dapat menambahkan lembar kosong di akhir | Nonaktifkan page break pada halaman terakhir |
 | Sedang | Judul Dokumen Baku, Tabel Informasi, dan Blok Tanda Tangan tidak diperlukan | Antarmuka dan ekspor menjadi rumit serta memicu duplikasi judul | Hapus kontrol, renderer, model aktif, ekspor, dan bersihkan field lama saat proyek dimuat |
+| Kritis | Kanvas, pratinjau cetak, dan DOCX memakai tiga renderer berbeda; DOCX membangun ulang kolase sebagai tabel Word 4:3 | Ukuran/crop/grid berubah, jarak membesar, dan posisi teks tidak sama dengan aplikasi | Jadikan satu renderer halaman sebagai sumber resmi; raster setiap halaman ke PNG 300 DPI untuk cetak dan DOCX |
+| Tinggi | Pratinjau cetak memakai `clip-path`, sedangkan editor memakai posisi dan skala gambar berdasarkan `cropRect` | Foto yang sudah di-crop dapat menampilkan area berbeda pada hasil akhir | Satukan rumus crop, rotasi, tipografi, efek teks, margin, dan ukuran kertas dalam utilitas visual bersama |
+| Tinggi | Ukuran kertas Custom tidak dipakai oleh kanvas editor | Kanvas Custom dan ukuran output dapat memiliki rasio berbeda | Gunakan satu perhitungan geometri dokumen untuk editor, pratinjau, raster, cetak, dan DOCX |
 
 ## Model data lokal
 
@@ -33,3 +36,5 @@ Proyek dan galeri foto disimpan sebagai satu `WorkspaceSnapshot` berversi. Index
 ## Batas platform
 
 Web browser dapat membaca file yang dipilih pengguna dan menghasilkan download tanpa server. Browser tidak dapat mengakses daftar printer Windows secara langsung. Dialog `window.print()` adalah jalur yang aman dan didukung untuk mendeteksi serta memilih printer, ukuran, warna, dan jumlah salinan melalui Windows.
+
+DOCX WYSIWYG sengaja berisi satu gambar halaman penuh per lembar, bukan tabel, paragraf, dan gambar Word terpisah. Pilihan ini mempertahankan tampilan akhir, tetapi elemen di dalam halaman tidak dapat diedit secara individual di Microsoft Word.
