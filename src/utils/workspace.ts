@@ -126,6 +126,23 @@ export const deduplicatePhotos = (photos: PhotoMetadata[]): PhotoMetadata[] => {
   });
 };
 
+const removeRetiredPageSections = (project: DocumentProject): DocumentProject => ({
+  ...project,
+  pages: project.pages.map((page) => {
+    const legacyPage = page as DocumentPage & Record<string, unknown>;
+    const {
+      subtitle: _subtitle,
+      metaTable: _metaTable,
+      signatureBlock: _signatureBlock,
+      showTitle: _showTitle,
+      showMetaTable: _showMetaTable,
+      showSignature: _showSignature,
+      ...currentPage
+    } = legacyPage;
+    return currentPage as DocumentPage;
+  }),
+});
+
 export const createWorkspaceSnapshot = (
   project: DocumentProject,
   photos: PhotoMetadata[],
@@ -133,7 +150,7 @@ export const createWorkspaceSnapshot = (
   kind: 'dokufoto-workspace',
   schemaVersion: WORKSPACE_SCHEMA_VERSION,
   savedAt: new Date().toISOString(),
-  project,
+  project: removeRetiredPageSections(project),
   photos: deduplicatePhotos(photos),
 });
 

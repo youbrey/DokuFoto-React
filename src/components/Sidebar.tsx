@@ -47,9 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'text' as SidebarTab,
-      label: 'Teks & TTD',
+      label: 'Teks',
       icon: Type,
-      desc: 'Judul, agenda, & tanda tangan',
+      desc: 'Tambahkan dan atur teks bebas',
     },
     {
       id: 'margins' as SidebarTab,
@@ -110,4 +110,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-

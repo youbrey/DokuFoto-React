@@ -123,19 +123,6 @@ export interface FloatingTextElement {
   isLocked?: boolean;
 }
 
-export interface MetaTableItem {
-  label: string;
-  value: string;
-}
-
-export interface SignatureBlockData {
-  enabled: boolean;
-  cityAndDate: string;
-  roleTitle: string;
-  officerName: string;
-  nip: string;
-}
-
 export interface FooterConfig {
   enabled: boolean;
   textLeft?: string;
@@ -147,11 +134,9 @@ export interface DocumentPage {
   id: string;
   pageNumber: number;
   title: string;
-  subtitle?: string;
   activityDate?: string;
   activityLocation?: string;
   activityDescription?: string;
-  metaTable?: MetaTableItem[];
   layoutTemplateId: string;
   cells: CollageCell[];
   gridGapMm: number; // gap between photos in mm
@@ -163,14 +148,9 @@ export interface DocumentPage {
   customGridColumns?: number; // Dynamic custom grid column count (1 - 6)
   customGridRows?: number; // Dynamic custom grid row count (1 - 6)
   customNotes?: string;
-  signatureBlock?: SignatureBlockData;
-  // Modular visibility toggles for zero-forced columns:
   showKopSurat?: boolean;
-  showTitle?: boolean;
-  showMetaTable?: boolean;
   showDescription?: boolean;
   showCollageGrid?: boolean;
-  showSignature?: boolean;
   showFooter?: boolean;
   footerConfig?: FooterConfig;
   // Freeform Floating Rich Text Elements
@@ -195,12 +175,4 @@ export interface DocumentProject {
   updatedAt: string;
   author: string;
   institution: string;
-}
-
-export interface PrinterDevice {
-  name: string;
-  status: 'Ready' | 'Printing' | 'Offline' | 'Paused';
-  isDefault: boolean;
-  driverName?: string;
-  connectionType: 'USB' | 'Network' | 'Virtual' | 'Wi-Fi';
 }
